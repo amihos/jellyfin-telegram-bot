@@ -1,0 +1,36 @@
+[Unit]
+Description=Jellyfin Telegram Notification Bot
+After=network.target
+
+[Service]
+Type=simple
+User=jellyfin-bot
+Group=jellyfin-bot
+WorkingDirectory=/opt/jellyfin-bot
+ExecStart=/opt/jellyfin-bot/jellyfin-bot
+Restart=always
+RestartSec=10
+
+# Environment variables (alternatively use EnvironmentFile)
+# EnvironmentFile=/opt/jellyfin-bot/.env
+Environment="TELEGRAM_BOT_TOKEN=your-bot-token-here"
+Environment="JELLYFIN_SERVER_URL=http://your-jellyfin-server:8096"
+Environment="JELLYFIN_API_KEY=your-api-key-here"
+Environment="WEBHOOK_SECRET=your-webhook-secret-here"
+Environment="DATABASE_PATH=/opt/jellyfin-bot/bot.db"
+Environment="PORT=8080"
+
+# Logging (journald will handle this automatically)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=jellyfin-bot
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/jellyfin-bot
+
+[Install]
+WantedBy=multi-user.target

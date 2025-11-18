@@ -1,0 +1,13 @@
+task_groups:
+  - name: Project Setup and Architecture
+    claude_code_subagent: implementer
+  - name: Data Models and Storage
+    claude_code_subagent: implementer
+  - name: Jellyfin Webhook Receiver
+    claude_code_subagent: implementer
+  - name: Jellyfin API Client
+    claude_code_subagent: implementer
+  - name: Bot Commands and Notification System
+    claude_code_subagent: implementer
+  - name: Integration Testing and Deployment Preparation
+    claude_code_subagent: implementer
