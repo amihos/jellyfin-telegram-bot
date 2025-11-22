@@ -32,7 +32,7 @@ func NewDB(dbPath string) (*DB, error) {
 	slog.Info("Connected to database", "path", dbPath)
 
 	// Auto-migrate schema
-	if err := db.AutoMigrate(&models.Subscriber{}, &models.ContentCache{}); err != nil {
+	if err := db.AutoMigrate(&models.Subscriber{}, &models.ContentCache{}, &models.MutedSeries{}); err != nil {
 		return nil, fmt.Errorf("failed to migrate database schema: %w", err)
 	}
 

@@ -13,6 +13,13 @@ type Config struct {
 	Webhook  WebhookConfig
 	Database DatabaseConfig
 	Logger   LoggerConfig
+	Testing  TestingConfig
+}
+
+// TestingConfig holds testing and feature flag configuration
+type TestingConfig struct {
+	TesterChatIDs     []int64 // Chat IDs that can access beta features
+	EnableBetaFeatures bool    // Global flag to enable/disable beta features
 }
 
 // TelegramConfig holds Telegram bot configuration
@@ -55,6 +62,10 @@ func LoadConfig() (*Config, error) {
 			Path: getEnv("DATABASE_PATH", "./bot.db"),
 		},
 		Logger: GetLoggerFromEnv(),
+		Testing: TestingConfig{
+			TesterChatIDs:     getEnvInt64Slice("TESTER_CHAT_IDS", []int64{}),
+			EnableBetaFeatures: getEnvBool("ENABLE_BETA_FEATURES", false),
+		},
 	}
 
 	// Validate required fields
@@ -92,4 +103,95 @@ func getEnvInt(key string, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+// getEnvBool gets a boolean environment variable with a default value
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
+	}
+	return defaultValue
+}
+
+// getEnvInt64Slice gets a comma-separated list of int64 values with a default
+func getEnvInt64Slice(key string, defaultValue []int64) []int64 {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	var result []int64
+	for _, part := range splitAndTrim(value, ",") {
+		if intValue, err := strconv.ParseInt(part, 10, 64); err == nil {
+			result = append(result, intValue)
+		}
+	}
+
+	if len(result) == 0 {
+		return defaultValue
+	}
+	return result
+}
+
+// splitAndTrim splits a string and trims whitespace from each part
+func splitAndTrim(s, sep string) []string {
+	var result []string
+	for _, part := range splitString(s, sep) {
+		trimmed := trimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+// splitString splits a string by separator
+func splitString(s, sep string) []string {
+	if s == "" {
+		return []string{}
+	}
+	var parts []string
+	var current string
+	for i := 0; i < len(s); i++ {
+		if string(s[i]) == sep {
+			parts = append(parts, current)
+			current = ""
+		} else {
+			current += string(s[i])
+		}
+	}
+	parts = append(parts, current)
+	return parts
+}
+
+// trimSpace removes leading and trailing whitespace
+func trimSpace(s string) string {
+	start := 0
+	end := len(s)
+
+	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
+		start++
+	}
+
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
+		end--
+	}
+
+	return s[start:end]
+}
+
+// IsTester checks if a chat ID is in the tester allowlist
+func (c *Config) IsTester(chatID int64) bool {
+	if !c.Testing.EnableBetaFeatures {
+		return false
+	}
+
+	for _, testerID := range c.Testing.TesterChatIDs {
+		if testerID == chatID {
+			return true
+		}
+	}
+	return false
 }

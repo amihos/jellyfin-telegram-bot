@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"github.com/go-telegram/bot"
-	"github.com/go-telegram/bot/models"
+	botModels "github.com/go-telegram/bot/models"
 )
 
 // handleStart handles the /start command
-func (b *Bot) handleStart(ctx context.Context, _ *bot.Bot, update *models.Update) {
+func (b *Bot) handleStart(ctx context.Context, _ *bot.Bot, update *botModels.Update) {
 	if update.Message == nil {
 		return
 	}
@@ -45,7 +45,8 @@ func (b *Bot) handleStart(ctx context.Context, _ *bot.Bot, update *models.Update
 دستورات موجود:
 /start - عضویت در ربات
 /recent - مشاهده محتوای اخیر
-/search - جستجوی محتوا`
+/search - جستجوی محتوا
+/mutedlist - مشاهده سریال‌های مسدود شده`
 
 	err = b.SendMessage(ctx, chatID, welcomeMessage)
 	if err != nil {
@@ -60,7 +61,7 @@ func (b *Bot) handleStart(ctx context.Context, _ *bot.Bot, update *models.Update
 }
 
 // handleRecent handles the /recent command
-func (b *Bot) handleRecent(ctx context.Context, _ *bot.Bot, update *models.Update) {
+func (b *Bot) handleRecent(ctx context.Context, _ *bot.Bot, update *botModels.Update) {
 	if update.Message == nil {
 		return
 	}
@@ -98,7 +99,7 @@ func (b *Bot) handleRecent(ctx context.Context, _ *bot.Bot, update *models.Updat
 }
 
 // handleSearch handles the /search command
-func (b *Bot) handleSearch(ctx context.Context, _ *bot.Bot, update *models.Update) {
+func (b *Bot) handleSearch(ctx context.Context, _ *bot.Bot, update *botModels.Update) {
 	if update.Message == nil {
 		return
 	}
@@ -149,6 +150,72 @@ func (b *Bot) handleSearch(ctx context.Context, _ *bot.Bot, update *models.Updat
 		"chat_id", chatID,
 		"query", query,
 		"count", len(items))
+}
+
+// handleMutedList handles the /mutedlist command
+func (b *Bot) handleMutedList(ctx context.Context, _ *bot.Bot, update *botModels.Update) {
+	if update.Message == nil {
+		return
+	}
+
+	chatID := update.Message.Chat.ID
+
+	slog.Info("Processing /mutedlist command", "chat_id", chatID)
+
+	// Get all muted series for this user
+	mutedSeries, err := b.db.GetMutedSeriesByUser(chatID)
+	if err != nil {
+		slog.Error("Failed to get muted series",
+			"chat_id", chatID,
+			"error", err)
+
+		errorMsg := "خطا در دریافت لیست سریال‌های مسدود شده. لطفاً بعداً تلاش کنید."
+		b.SendMessage(ctx, chatID, errorMsg)
+		return
+	}
+
+	// Handle empty list case
+	if len(mutedSeries) == 0 {
+		emptyMsg := "شما هیچ سریالی را مسدود نکرده‌اید"
+		b.SendMessage(ctx, chatID, emptyMsg)
+		return
+	}
+
+	// Format response message
+	var messageText strings.Builder
+	messageText.WriteString("سریال‌های مسدود شده:\n\n")
+
+	// Create inline keyboard with unmute button for each series
+	var buttons [][]botModels.InlineKeyboardButton
+
+	for i, series := range mutedSeries {
+		// Add series to message
+		messageText.WriteString(fmt.Sprintf("%d. %s\n", i+1, series.SeriesName))
+
+		// Create unmute button for this series
+		buttons = append(buttons, []botModels.InlineKeyboardButton{
+			{
+				Text:         fmt.Sprintf("رفع مسدودیت: %s", series.SeriesName),
+				CallbackData: fmt.Sprintf("unmute:%s", series.SeriesID),
+			},
+		})
+	}
+
+	keyboard := &botModels.InlineKeyboardMarkup{
+		InlineKeyboard: buttons,
+	}
+
+	// Send message with inline keyboard
+	err = b.SendMessageWithKeyboard(ctx, chatID, messageText.String(), keyboard)
+	if err != nil {
+		slog.Error("Failed to send muted list",
+			"chat_id", chatID,
+			"error", err)
+	}
+
+	slog.Info("Sent muted list",
+		"chat_id", chatID,
+		"count", len(mutedSeries))
 }
 
 // sendContentItem sends a single content item with poster and formatted message

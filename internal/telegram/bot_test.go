@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"jellyfin-telegram-bot/pkg/models"
 )
 
 // Mock implementations for testing
 
 type MockSubscriberDB struct {
 	subscribers    map[int64]bool
+	mutedSeries    map[int64]map[string]bool // chatID -> seriesID -> isMuted
 	shouldFailAdd  bool
 	shouldFailGet  bool
 }
@@ -17,6 +20,7 @@ type MockSubscriberDB struct {
 func NewMockSubscriberDB() *MockSubscriberDB {
 	return &MockSubscriberDB{
 		subscribers: make(map[int64]bool),
+		mutedSeries: make(map[int64]map[string]bool),
 	}
 }
 
@@ -48,6 +52,42 @@ func (m *MockSubscriberDB) GetAllActiveSubscribers() ([]int64, error) {
 
 func (m *MockSubscriberDB) IsSubscribed(chatID int64) (bool, error) {
 	return m.subscribers[chatID], nil
+}
+
+func (m *MockSubscriberDB) AddMutedSeries(chatID int64, seriesID string, seriesName string) error {
+	if m.mutedSeries[chatID] == nil {
+		m.mutedSeries[chatID] = make(map[string]bool)
+	}
+	m.mutedSeries[chatID][seriesID] = true
+	return nil
+}
+
+func (m *MockSubscriberDB) RemoveMutedSeries(chatID int64, seriesID string) error {
+	if m.mutedSeries[chatID] != nil {
+		delete(m.mutedSeries[chatID], seriesID)
+	}
+	return nil
+}
+
+func (m *MockSubscriberDB) GetMutedSeriesByUser(chatID int64) ([]models.MutedSeries, error) {
+	var result []models.MutedSeries
+	if m.mutedSeries[chatID] != nil {
+		for seriesID := range m.mutedSeries[chatID] {
+			result = append(result, models.MutedSeries{
+				ChatID:     chatID,
+				SeriesID:   seriesID,
+				SeriesName: seriesID,
+			})
+		}
+	}
+	return result, nil
+}
+
+func (m *MockSubscriberDB) IsSeriesMuted(chatID int64, seriesID string) (bool, error) {
+	if m.mutedSeries[chatID] != nil {
+		return m.mutedSeries[chatID][seriesID], nil
+	}
+	return false, nil
 }
 
 type MockJellyfinClient struct {

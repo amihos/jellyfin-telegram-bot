@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 
+	"jellyfin-telegram-bot/pkg/models"
+
 	"github.com/go-telegram/bot"
-	"github.com/go-telegram/bot/models"
+	botModels "github.com/go-telegram/bot/models"
 )
 
 // Bot represents the Telegram bot instance
@@ -23,6 +25,11 @@ type SubscriberDB interface {
 	RemoveSubscriber(chatID int64) error
 	GetAllActiveSubscribers() ([]int64, error)
 	IsSubscribed(chatID int64) (bool, error)
+	// Mute operations
+	AddMutedSeries(chatID int64, seriesID string, seriesName string) error
+	RemoveMutedSeries(chatID int64, seriesID string) error
+	GetMutedSeriesByUser(chatID int64) ([]models.MutedSeries, error)
+	IsSeriesMuted(chatID int64, seriesID string) (bool, error)
 }
 
 // JellyfinClient defines the interface for Jellyfin API operations
@@ -52,8 +59,19 @@ func NewBot(token string, db SubscriberDB, jellyfinClient JellyfinClient) (*Bot,
 		return nil, fmt.Errorf("TELEGRAM_BOT_TOKEN is required")
 	}
 
+	botInstance := &Bot{
+		db:             db,
+		jellyfinClient: jellyfinClient,
+	}
+
 	opts := []bot.Option{
 		bot.WithDefaultHandler(defaultHandler),
+		bot.WithMessageTextHandler("/start", bot.MatchTypeExact, botInstance.handleStart),
+		bot.WithMessageTextHandler("/recent", bot.MatchTypeExact, botInstance.handleRecent),
+		bot.WithMessageTextHandler("/search", bot.MatchTypePrefix, botInstance.handleSearch),
+		bot.WithMessageTextHandler("/mutedlist", bot.MatchTypeExact, botInstance.handleMutedList),
+		bot.WithCallbackQueryDataHandler("mute:", bot.MatchTypePrefix, botInstance.handleMuteCallback),
+		bot.WithCallbackQueryDataHandler("unmute:", bot.MatchTypePrefix, botInstance.handleUnmuteCallback),
 	}
 
 	b, err := bot.New(token, opts...)
@@ -61,16 +79,7 @@ func NewBot(token string, db SubscriberDB, jellyfinClient JellyfinClient) (*Bot,
 		return nil, fmt.Errorf("failed to create bot: %w", err)
 	}
 
-	botInstance := &Bot{
-		bot:            b,
-		db:             db,
-		jellyfinClient: jellyfinClient,
-	}
-
-	// Register command handlers
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypeExact, botInstance.handleStart)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/recent", bot.MatchTypeExact, botInstance.handleRecent)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/search", bot.MatchTypePrefix, botInstance.handleSearch)
+	botInstance.bot = b
 
 	slog.Info("Telegram bot initialized successfully")
 
@@ -84,7 +93,7 @@ func (b *Bot) Start(ctx context.Context) {
 }
 
 // defaultHandler handles unknown commands and messages
-func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+func defaultHandler(ctx context.Context, b *bot.Bot, update *botModels.Update) {
 	if update.Message == nil {
 		return
 	}
@@ -95,7 +104,8 @@ func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 دستورات موجود:
 /start - عضویت در ربات
 /recent - مشاهده محتوای اخیر
-/search - جستجوی محتوا (مثال: /search interstellar)`
+/search - جستجوی محتوا (مثال: /search interstellar)
+/mutedlist - مشاهده سریال‌های مسدود شده`
 
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
@@ -118,12 +128,33 @@ func (b *Bot) SendMessage(ctx context.Context, chatID int64, text string) error 
 	return err
 }
 
+// SendMessageWithKeyboard sends a text message with an inline keyboard to a chat
+func (b *Bot) SendMessageWithKeyboard(ctx context.Context, chatID int64, text string, keyboard *botModels.InlineKeyboardMarkup) error {
+	_, err := b.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:      chatID,
+		Text:        text,
+		ReplyMarkup: keyboard,
+	})
+	return err
+}
+
 // SendPhotoBytes sends a photo with caption to a chat using byte data
 func (b *Bot) SendPhotoBytes(ctx context.Context, chatID int64, imageData []byte, caption string) error {
 	_, err := b.bot.SendPhoto(ctx, &bot.SendPhotoParams{
 		ChatID:  chatID,
-		Photo:   &models.InputFileUpload{Data: bytes.NewReader(imageData), Filename: "poster.jpg"},
+		Photo:   &botModels.InputFileUpload{Data: bytes.NewReader(imageData), Filename: "poster.jpg"},
 		Caption: caption,
+	})
+	return err
+}
+
+// SendPhotoBytesWithKeyboard sends a photo with caption and inline keyboard to a chat using byte data
+func (b *Bot) SendPhotoBytesWithKeyboard(ctx context.Context, chatID int64, imageData []byte, caption string, keyboard *botModels.InlineKeyboardMarkup) error {
+	_, err := b.bot.SendPhoto(ctx, &bot.SendPhotoParams{
+		ChatID:      chatID,
+		Photo:       &botModels.InputFileUpload{Data: bytes.NewReader(imageData), Filename: "poster.jpg"},
+		Caption:     caption,
+		ReplyMarkup: keyboard,
 	})
 	return err
 }

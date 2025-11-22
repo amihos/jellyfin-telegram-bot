@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	botModels "github.com/go-telegram/bot/models"
 )
 
 // NotificationContent represents content to be broadcasted
@@ -69,6 +71,35 @@ func FormatNotification(content *NotificationContent) string {
 	return message.String()
 }
 
+// shouldShowMuteButton checks if mute button should be shown for this content
+func shouldShowMuteButton(content *NotificationContent) bool {
+	// Only show for episodes, not movies
+	if content.Type != "Episode" {
+		return false
+	}
+
+	// Don't show if series name is empty or "Unknown Series"
+	if content.SeriesName == "" || content.SeriesName == "Unknown Series" {
+		return false
+	}
+
+	return true
+}
+
+// createMuteButton creates inline keyboard with mute button
+func createMuteButton(seriesName string) *botModels.InlineKeyboardMarkup {
+	return &botModels.InlineKeyboardMarkup{
+		InlineKeyboard: [][]botModels.InlineKeyboardButton{
+			{
+				{
+					Text:         "دنبال نکردن",
+					CallbackData: fmt.Sprintf("mute:%s", seriesName),
+				},
+			},
+		},
+	}
+}
+
 // BroadcastNotification sends a notification to all active subscribers
 func (b *Bot) BroadcastNotification(ctx context.Context, content *NotificationContent) error {
 	// Get all active subscribers
@@ -82,13 +113,63 @@ func (b *Bot) BroadcastNotification(ctx context.Context, content *NotificationCo
 		return nil
 	}
 
+	// Filter out muted users for episode notifications
+	filteredSubscribers := subscribers
+	mutedCount := 0
+
+	if content.Type == "Episode" && content.SeriesName != "" {
+		filteredSubscribers = make([]int64, 0, len(subscribers))
+		for _, chatID := range subscribers {
+			isMuted, err := b.db.IsSeriesMuted(chatID, content.SeriesName)
+			if err != nil {
+				slog.Error("Failed to check if series is muted, including subscriber",
+					"chat_id", chatID,
+					"series_name", content.SeriesName,
+					"error", err)
+				// Include subscriber if check fails to avoid missing notifications
+				filteredSubscribers = append(filteredSubscribers, chatID)
+				continue
+			}
+
+			if !isMuted {
+				filteredSubscribers = append(filteredSubscribers, chatID)
+			} else {
+				mutedCount++
+			}
+		}
+
+		if mutedCount > 0 {
+			slog.Info("Filtered muted users",
+				"muted_count", mutedCount,
+				"series_name", content.SeriesName)
+		}
+	}
+
+	if len(filteredSubscribers) == 0 {
+		slog.Info("No subscribers to notify after filtering",
+			"total_subscribers", len(subscribers),
+			"muted_count", mutedCount)
+		return nil
+	}
+
 	slog.Info("Broadcasting notification",
 		"content_type", content.Type,
 		"title", content.Title,
-		"subscriber_count", len(subscribers))
+		"subscriber_count", len(filteredSubscribers),
+		"filtered_count", mutedCount)
 
 	// Format notification message
 	message := FormatNotification(content)
+
+	// Create inline keyboard for episodes with valid series name
+	var keyboard *botModels.InlineKeyboardMarkup
+	if shouldShowMuteButton(content) {
+		keyboard = createMuteButton(content.SeriesName)
+	} else if !shouldShowMuteButton(content) && content.Type == "Episode" {
+		slog.Debug("Skipping mute button",
+			"reason", "invalid series name",
+			"series_name", content.SeriesName)
+	}
 
 	// Fetch poster image
 	var imageData []byte
@@ -107,8 +188,8 @@ func (b *Bot) BroadcastNotification(ctx context.Context, content *NotificationCo
 	failureCount := 0
 	blockedCount := 0
 
-	// Broadcast to all subscribers
-	for _, chatID := range subscribers {
+	// Broadcast to all filtered subscribers
+	for _, chatID := range filteredSubscribers {
 		// Handle Telegram rate limiting (max 30 messages/second)
 		// Add small delay to avoid hitting rate limits
 		time.Sleep(35 * time.Millisecond)
@@ -116,10 +197,18 @@ func (b *Bot) BroadcastNotification(ctx context.Context, content *NotificationCo
 		var sendErr error
 		if imageData != nil && len(imageData) > 0 {
 			// Send with image
-			sendErr = b.SendPhotoBytes(ctx, chatID, imageData, message)
+			if keyboard != nil {
+				sendErr = b.SendPhotoBytesWithKeyboard(ctx, chatID, imageData, message, keyboard)
+			} else {
+				sendErr = b.SendPhotoBytes(ctx, chatID, imageData, message)
+			}
 		} else {
 			// Send text only
-			sendErr = b.SendMessage(ctx, chatID, message)
+			if keyboard != nil {
+				sendErr = b.SendMessageWithKeyboard(ctx, chatID, message, keyboard)
+			} else {
+				sendErr = b.SendMessage(ctx, chatID, message)
+			}
 		}
 
 		if sendErr != nil {
@@ -151,6 +240,8 @@ func (b *Bot) BroadcastNotification(ctx context.Context, content *NotificationCo
 
 	slog.Info("Broadcast completed",
 		"total_subscribers", len(subscribers),
+		"muted_subscribers", mutedCount,
+		"sent_to", len(filteredSubscribers),
 		"success", successCount,
 		"failures", failureCount,
 		"blocked", blockedCount)

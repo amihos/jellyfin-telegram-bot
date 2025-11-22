@@ -1,0 +1,9 @@
+task_groups:
+  - name: Data Models and Database Operations
+    claude_code_subagent: implementer
+  - name: Notification Filtering and Mute Button
+    claude_code_subagent: implementer
+  - name: Callback Handlers and Commands
+    claude_code_subagent: implementer
+  - name: Integration Tests and Gap Analysis
+    claude_code_subagent: implementer
