@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"html"
+	"time"
+)
 
 // JellyfinWebhook represents the payload received from Jellyfin webhook plugin
 type JellyfinWebhook struct {
@@ -43,4 +46,12 @@ func (w *JellyfinWebhook) IsItemAdded() bool {
 // IsValid returns true if the webhook is valid for processing
 func (w *JellyfinWebhook) IsValid() bool {
 	return w.IsItemAdded() && (w.IsMovie() || w.IsEpisode())
+}
+
+// DecodeHTMLEntities decodes HTML entities in text fields
+// Jellyfin's webhook plugin HTML-encodes Unicode characters (including Persian text)
+func (w *JellyfinWebhook) DecodeHTMLEntities() {
+	w.ItemName = html.UnescapeString(w.ItemName)
+	w.Overview = html.UnescapeString(w.Overview)
+	w.SeriesName = html.UnescapeString(w.SeriesName)
 }

@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 
 	"jellyfin-telegram-bot/pkg/models"
 )
@@ -55,6 +57,27 @@ func (h *WebhookHandler) SetBroadcaster(broadcaster NotificationBroadcaster) {
 	h.broadcaster = broadcaster
 }
 
+// fixMalformedJSON fixes common JSON issues from Jellyfin webhooks
+// Handles cases like: "SeasonNumber": , or "EpisodeNumber": \n }
+func fixMalformedJSON(data []byte) []byte {
+	s := string(data)
+
+	// Fix pattern: "field": , (missing value before comma)
+	re1 := regexp.MustCompile(`"(\w+)":\s*,`)
+	s = re1.ReplaceAllString(s, `"$1": 0,`)
+
+	// Fix pattern: "field": \n } (missing value at end)
+	re2 := regexp.MustCompile(`"(\w+)":\s*\n`)
+	s = re2.ReplaceAllString(s, "\"$1\": 0\n")
+
+	// Fix pattern: numbers with leading zeros (e.g., 01, 04) - invalid in JSON
+	// Convert "field": 01 to "field": 1
+	re3 := regexp.MustCompile(`"(\w+)":\s*0+(\d+)`)
+	s = re3.ReplaceAllString(s, `"$1": $2`)
+
+	return []byte(s)
+}
+
 // HandleWebhook processes incoming webhook requests from Jellyfin
 func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	// Validate request method
@@ -75,15 +98,32 @@ func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Parse webhook payload
-	var payload models.JellyfinWebhook
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		slog.Error("Failed to parse webhook payload",
+	// Read body into buffer for potential logging
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		slog.Error("Failed to read webhook body",
 			"error", err,
 			"remote_addr", r.RemoteAddr)
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+
+	// Fix malformed JSON (Jellyfin may send empty values for optional fields)
+	bodyBytes = fixMalformedJSON(bodyBytes)
+
+	// Parse webhook payload
+	var payload models.JellyfinWebhook
+	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+		slog.Error("Failed to parse webhook payload",
+			"error", err,
+			"remote_addr", r.RemoteAddr,
+			"raw_body", string(bodyBytes))
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return
 	}
+
+	// Decode HTML entities (Jellyfin encodes Unicode characters)
+	payload.DecodeHTMLEntities()
 
 	// Log received webhook
 	slog.Info("Received webhook",
