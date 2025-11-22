@@ -161,11 +161,11 @@ func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		content := &NotificationContent{
 			ItemID:        payload.ItemID,
 			Type:          contentType,
-			Title:         payload.ItemName,
-			Overview:      payload.Overview,
+			Title:         metadata.Title,  // Use metadata.Title which has "Unknown" fallback
+			Overview:      metadata.Overview,  // Use metadata.Overview for consistency
 			Year:          payload.Year,
 			Rating:        0, // Webhook doesn't include rating - could fetch from API if needed
-			SeriesName:    payload.SeriesName,
+			SeriesName:    metadata.SeriesName,  // Use metadata.SeriesName for "Unknown Series" fallback
 			SeasonNumber:  payload.SeasonNumber,
 			EpisodeNumber: payload.EpisodeNumber,
 		}
