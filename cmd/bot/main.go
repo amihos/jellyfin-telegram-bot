@@ -58,7 +58,7 @@ func main() {
 	jellyfinAdapter := telegram.NewJellyfinClientAdapter(jellyfinClient)
 
 	// Initialize Telegram bot
-	bot, err := telegram.NewBot(cfg.Telegram.BotToken, db, jellyfinAdapter)
+	bot, err := telegram.NewBot(cfg.Telegram.BotToken, db, jellyfinAdapter, cfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize Telegram bot: %v", err)
 	}

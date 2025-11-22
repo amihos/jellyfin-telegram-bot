@@ -166,7 +166,7 @@ func TestNewBot_Success(t *testing.T) {
 	// Note: Bot creation requires a real Telegram token to connect to the API
 	// With a test token, it will fail with "not found" or authentication error
 	// This test verifies the validation logic works
-	bot, err := NewBot("test-token", db, jellyfin)
+	bot, err := NewBot("test-token", db, jellyfin, nil)
 
 	// Expect error since test-token is not valid for Telegram API
 	if err == nil {
@@ -186,7 +186,7 @@ func TestNewBot_EmptyToken(t *testing.T) {
 	db := NewMockSubscriberDB()
 	jellyfin := NewMockJellyfinClient()
 
-	bot, err := NewBot("", db, jellyfin)
+	bot, err := NewBot("", db, jellyfin, nil)
 
 	if err == nil {
 		t.Fatal("Expected error for empty token, got nil")

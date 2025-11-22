@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"jellyfin-telegram-bot/internal/config"
 	"jellyfin-telegram-bot/pkg/models"
 
 	"github.com/go-telegram/bot"
@@ -17,6 +18,7 @@ type Bot struct {
 	bot            *bot.Bot
 	db             SubscriberDB
 	jellyfinClient JellyfinClient
+	config         *config.Config
 }
 
 // SubscriberDB defines the interface for subscriber operations
@@ -54,7 +56,7 @@ type ContentItem struct {
 }
 
 // NewBot creates a new Telegram bot instance
-func NewBot(token string, db SubscriberDB, jellyfinClient JellyfinClient) (*Bot, error) {
+func NewBot(token string, db SubscriberDB, jellyfinClient JellyfinClient, cfg *config.Config) (*Bot, error) {
 	if token == "" {
 		return nil, fmt.Errorf("TELEGRAM_BOT_TOKEN is required")
 	}
@@ -62,6 +64,7 @@ func NewBot(token string, db SubscriberDB, jellyfinClient JellyfinClient) (*Bot,
 	botInstance := &Bot{
 		db:             db,
 		jellyfinClient: jellyfinClient,
+		config:         cfg,
 	}
 
 	opts := []bot.Option{

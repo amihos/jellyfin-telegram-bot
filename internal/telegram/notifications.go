@@ -113,13 +113,31 @@ func (b *Bot) BroadcastNotification(ctx context.Context, content *NotificationCo
 		return nil
 	}
 
-	// Filter out muted users for episode notifications
+	// Smart test detection: filter to only testers for test notifications
 	filteredSubscribers := subscribers
+	if len(content.ItemID) >= 5 && content.ItemID[:5] == "test-" {
+		if b.config != nil && b.config.Testing.EnableBetaFeatures {
+			// Filter to only testers
+			testSubscribers := make([]int64, 0, len(subscribers))
+			for _, chatID := range subscribers {
+				if b.config.IsTester(chatID) {
+					testSubscribers = append(testSubscribers, chatID)
+				}
+			}
+			filteredSubscribers = testSubscribers
+			slog.Info("Test notification detected - filtered to testers only",
+				"item_id", content.ItemID,
+				"total_subscribers", len(subscribers),
+				"tester_count", len(testSubscribers))
+		}
+	}
+
+	// Filter out muted users for episode notifications
 	mutedCount := 0
 
 	if content.Type == "Episode" && content.SeriesName != "" {
-		filteredSubscribers = make([]int64, 0, len(subscribers))
-		for _, chatID := range subscribers {
+		tempSubscribers := make([]int64, 0, len(filteredSubscribers))
+		for _, chatID := range filteredSubscribers {
 			isMuted, err := b.db.IsSeriesMuted(chatID, content.SeriesName)
 			if err != nil {
 				slog.Error("Failed to check if series is muted, including subscriber",
@@ -127,16 +145,17 @@ func (b *Bot) BroadcastNotification(ctx context.Context, content *NotificationCo
 					"series_name", content.SeriesName,
 					"error", err)
 				// Include subscriber if check fails to avoid missing notifications
-				filteredSubscribers = append(filteredSubscribers, chatID)
+				tempSubscribers = append(tempSubscribers, chatID)
 				continue
 			}
 
 			if !isMuted {
-				filteredSubscribers = append(filteredSubscribers, chatID)
+				tempSubscribers = append(tempSubscribers, chatID)
 			} else {
 				mutedCount++
 			}
 		}
+		filteredSubscribers = tempSubscribers
 
 		if mutedCount > 0 {
 			slog.Info("Filtered muted users",
