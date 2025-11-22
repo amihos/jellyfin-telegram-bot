@@ -73,7 +73,9 @@ func NewBot(token string, db SubscriberDB, jellyfinClient JellyfinClient, cfg *c
 		bot.WithMessageTextHandler("/recent", bot.MatchTypeExact, botInstance.handleRecent),
 		bot.WithMessageTextHandler("/search", bot.MatchTypePrefix, botInstance.handleSearch),
 		bot.WithMessageTextHandler("/mutedlist", bot.MatchTypeExact, botInstance.handleMutedList),
+		bot.WithCallbackQueryDataHandler("nav:", bot.MatchTypePrefix, botInstance.handleNavigationCallback),
 		bot.WithCallbackQueryDataHandler("mute:", bot.MatchTypePrefix, botInstance.handleMuteCallback),
+		bot.WithCallbackQueryDataHandler("undo_mute:", bot.MatchTypePrefix, botInstance.handleUndoMuteCallback),
 		bot.WithCallbackQueryDataHandler("unmute:", bot.MatchTypePrefix, botInstance.handleUnmuteCallback),
 	}
 
@@ -84,9 +86,52 @@ func NewBot(token string, db SubscriberDB, jellyfinClient JellyfinClient, cfg *c
 
 	botInstance.bot = b
 
+	// Register bot commands for Telegram Menu Button API
+	err = botInstance.registerBotCommands(context.Background())
+	if err != nil {
+		slog.Warn("Failed to register bot commands (non-fatal)",
+			"error", err)
+		// Non-fatal error - continue with bot initialization
+	}
+
 	slog.Info("Telegram bot initialized successfully")
 
 	return botInstance, nil
+}
+
+// registerBotCommands registers bot commands with Telegram for Menu Button integration
+func (b *Bot) registerBotCommands(ctx context.Context) error {
+	commands := []botModels.BotCommand{
+		{
+			Command:     "start",
+			Description: "عضویت در ربات",
+		},
+		{
+			Command:     "recent",
+			Description: "مشاهده محتوای اخیر",
+		},
+		{
+			Command:     "search",
+			Description: "جستجوی محتوا",
+		},
+		{
+			Command:     "mutedlist",
+			Description: "مشاهده سریال‌های مسدود شده",
+		},
+	}
+
+	_, err := b.bot.SetMyCommands(ctx, &bot.SetMyCommandsParams{
+		Commands: commands,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to set bot commands: %w", err)
+	}
+
+	slog.Info("Bot commands registered successfully",
+		"count", len(commands))
+
+	return nil
 }
 
 // Start starts the bot with polling mode

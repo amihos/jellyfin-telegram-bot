@@ -11,6 +11,219 @@ import (
 	"gorm.io/gorm"
 )
 
+// handleNavigationCallback handles navigation button callbacks from the welcome menu
+func (b *Bot) handleNavigationCallback(ctx context.Context, botInstance *bot.Bot, update *botModels.Update) {
+	if update.CallbackQuery == nil {
+		return
+	}
+
+	callbackQuery := update.CallbackQuery
+
+	// Check if message exists
+	if callbackQuery.Message.Message == nil {
+		slog.Warn("Callback query message is nil")
+		return
+	}
+
+	chatID := callbackQuery.Message.Message.Chat.ID
+	callbackData := callbackQuery.Data
+
+	slog.Info("Processing navigation callback",
+		"chat_id", chatID,
+		"callback_data", callbackData)
+
+	// Parse action from callback data (format: "nav:{action}")
+	parts := strings.SplitN(callbackData, ":", 2)
+	if len(parts) != 2 {
+		slog.Error("Invalid navigation callback data format",
+			"callback_data", callbackData)
+
+		// Always answer callback query to prevent stuck loading state
+		botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+			CallbackQueryID: callbackQuery.ID,
+			Text:            "خطا در پردازش درخواست",
+			ShowAlert:       false,
+		})
+		return
+	}
+
+	action := parts[1]
+
+	// Route to appropriate logic based on action
+	switch action {
+	case "recent":
+		b.handleNavigationRecent(ctx, botInstance, chatID, callbackQuery)
+	case "search":
+		b.handleNavigationSearch(ctx, botInstance, chatID, callbackQuery)
+	case "mutedlist":
+		b.handleNavigationMutedList(ctx, botInstance, chatID, callbackQuery)
+	case "help":
+		b.handleNavigationHelp(ctx, botInstance, chatID, callbackQuery)
+	default:
+		slog.Warn("Unknown navigation action",
+			"action", action,
+			"chat_id", chatID)
+
+		// Answer callback query with error
+		botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+			CallbackQueryID: callbackQuery.ID,
+			Text:            "دستور نامعتبر است",
+			ShowAlert:       false,
+		})
+	}
+}
+
+// handleNavigationRecent handles nav:recent callback
+func (b *Bot) handleNavigationRecent(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery) {
+	slog.Info("Processing nav:recent", "chat_id", chatID)
+
+	// Answer callback query immediately to remove loading state
+	botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: callbackQuery.ID,
+		ShowAlert:       false,
+	})
+
+	// Fetch recent items from Jellyfin (reuse handleRecent logic)
+	items, err := b.jellyfinClient.GetRecentItems(ctx, 15)
+	if err != nil {
+		slog.Error("Failed to fetch recent items",
+			"chat_id", chatID,
+			"error", err)
+
+		errorMsg := "خطا در دریافت محتوای اخیر. لطفاً بعداً تلاش کنید."
+		b.SendMessage(ctx, chatID, errorMsg)
+		return
+	}
+
+	// Handle empty results
+	if len(items) == 0 {
+		b.SendMessage(ctx, chatID, "محتوای اخیری یافت نشد")
+		return
+	}
+
+	// Send each item with poster and formatted message
+	for _, item := range items {
+		b.sendContentItem(ctx, chatID, &item)
+	}
+
+	slog.Info("Sent recent items via navigation",
+		"chat_id", chatID,
+		"count", len(items))
+}
+
+// handleNavigationSearch handles nav:search callback
+func (b *Bot) handleNavigationSearch(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery) {
+	slog.Info("Processing nav:search", "chat_id", chatID)
+
+	// Answer callback query immediately to remove loading state
+	botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: callbackQuery.ID,
+		ShowAlert:       false,
+	})
+
+	// Send search instructions in Persian
+	searchInstructions := "لطفاً عبارت جستجو را وارد کنید. مثال: /search interstellar"
+	if err := b.SendMessage(ctx, chatID, searchInstructions); err != nil {
+		slog.Error("Failed to send search instructions",
+			"chat_id", chatID,
+			"error", err)
+	}
+
+	slog.Info("Sent search instructions via navigation", "chat_id", chatID)
+}
+
+// handleNavigationMutedList handles nav:mutedlist callback
+func (b *Bot) handleNavigationMutedList(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery) {
+	slog.Info("Processing nav:mutedlist", "chat_id", chatID)
+
+	// Answer callback query immediately to remove loading state
+	botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: callbackQuery.ID,
+		ShowAlert:       false,
+	})
+
+	// Get all muted series for this user (reuse handleMutedList logic)
+	mutedSeries, err := b.db.GetMutedSeriesByUser(chatID)
+	if err != nil {
+		slog.Error("Failed to get muted series",
+			"chat_id", chatID,
+			"error", err)
+
+		errorMsg := "خطا در دریافت لیست سریال‌های مسدود شده. لطفاً بعداً تلاش کنید."
+		b.SendMessage(ctx, chatID, errorMsg)
+		return
+	}
+
+	// Handle empty list case
+	if len(mutedSeries) == 0 {
+		emptyMsg := "شما هیچ سریالی را مسدود نکرده‌اید"
+		b.SendMessage(ctx, chatID, emptyMsg)
+		return
+	}
+
+	// Format response message
+	var messageText strings.Builder
+	messageText.WriteString("سریال‌های مسدود شده:\n\n")
+
+	// Create inline keyboard with unmute button for each series
+	var buttons [][]botModels.InlineKeyboardButton
+
+	for i, series := range mutedSeries {
+		// Add series to message
+		messageText.WriteString(fmt.Sprintf("%d. %s\n", i+1, series.SeriesName))
+
+		// Create unmute button for this series
+		buttons = append(buttons, []botModels.InlineKeyboardButton{
+			{
+				Text:         fmt.Sprintf("رفع مسدودیت: %s", series.SeriesName),
+				CallbackData: fmt.Sprintf("unmute:%s", series.SeriesID),
+			},
+		})
+	}
+
+	keyboard := &botModels.InlineKeyboardMarkup{
+		InlineKeyboard: buttons,
+	}
+
+	// Send message with inline keyboard
+	err = b.SendMessageWithKeyboard(ctx, chatID, messageText.String(), keyboard)
+	if err != nil {
+		slog.Error("Failed to send muted list via navigation",
+			"chat_id", chatID,
+			"error", err)
+	}
+
+	slog.Info("Sent muted list via navigation",
+		"chat_id", chatID,
+		"count", len(mutedSeries))
+}
+
+// handleNavigationHelp handles nav:help callback
+func (b *Bot) handleNavigationHelp(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery) {
+	slog.Info("Processing nav:help", "chat_id", chatID)
+
+	// Answer callback query immediately to remove loading state
+	botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: callbackQuery.ID,
+		ShowAlert:       false,
+	})
+
+	// Send help message in Persian (reuse help message from defaultHandler)
+	helpMessage := `دستورات موجود:
+/start - عضویت در ربات
+/recent - مشاهده محتوای اخیر
+/search - جستجوی محتوا (مثال: /search interstellar)
+/mutedlist - مشاهده سریال‌های مسدود شده`
+
+	if err := b.SendMessage(ctx, chatID, helpMessage); err != nil {
+		slog.Error("Failed to send help message via navigation",
+			"chat_id", chatID,
+			"error", err)
+	}
+
+	slog.Info("Sent help message via navigation", "chat_id", chatID)
+}
+
 // handleMuteCallback handles the mute button callback
 func (b *Bot) handleMuteCallback(ctx context.Context, botInstance *bot.Bot, update *botModels.Update) {
 	if update.CallbackQuery == nil {
@@ -66,10 +279,23 @@ func (b *Bot) handleMuteCallback(ctx context.Context, botInstance *bot.Bot, upda
 		ShowAlert:       false,
 	})
 
-	// Send confirmation message
+	// Send confirmation message with undo button
 	confirmationMsg := fmt.Sprintf("✓ شما دیگر اعلان‌های %s را دریافت نخواهید کرد", seriesName)
-	if err := b.SendMessage(ctx, chatID, confirmationMsg); err != nil {
-		slog.Error("Failed to send confirmation message",
+
+	// Create inline keyboard with undo button
+	undoKeyboard := &botModels.InlineKeyboardMarkup{
+		InlineKeyboard: [][]botModels.InlineKeyboardButton{
+			{
+				{
+					Text:         "رفع مسدودیت",
+					CallbackData: fmt.Sprintf("undo_mute:%s", seriesName),
+				},
+			},
+		},
+	}
+
+	if err := b.SendMessageWithKeyboard(ctx, chatID, confirmationMsg, undoKeyboard); err != nil {
+		slog.Error("Failed to send confirmation message with undo button",
 			"chat_id", chatID,
 			"error", err)
 	}
@@ -103,6 +329,123 @@ func (b *Bot) handleMuteCallback(ctx context.Context, botInstance *bot.Bot, upda
 	}
 
 	slog.Info("Successfully muted series",
+		"chat_id", chatID,
+		"series_name", seriesName)
+}
+
+// handleUndoMuteCallback handles the undo mute button callback
+func (b *Bot) handleUndoMuteCallback(ctx context.Context, botInstance *bot.Bot, update *botModels.Update) {
+	if update.CallbackQuery == nil {
+		return
+	}
+
+	callbackQuery := update.CallbackQuery
+
+	// Check if message exists
+	if callbackQuery.Message.Message == nil {
+		slog.Warn("Callback query message is nil")
+		return
+	}
+
+	chatID := callbackQuery.Message.Message.Chat.ID
+	callbackData := callbackQuery.Data
+
+	slog.Info("Processing undo mute callback",
+		"chat_id", chatID,
+		"callback_data", callbackData)
+
+	// Parse series name from callback data (format: "undo_mute:{SeriesName}")
+	parts := strings.SplitN(callbackData, ":", 2)
+	if len(parts) != 2 {
+		slog.Error("Invalid callback data format",
+			"callback_data", callbackData)
+
+		// Always answer callback query
+		botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+			CallbackQueryID: callbackQuery.ID,
+			Text:            "خطا در پردازش درخواست",
+			ShowAlert:       false,
+		})
+		return
+	}
+
+	seriesName := parts[1]
+
+	// Remove muted series from database (reuse unmute logic from handleUnmuteCallback)
+	err := b.db.RemoveMutedSeries(chatID, seriesName)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			slog.Debug("Series not found in muted list",
+				"chat_id", chatID,
+				"series_name", seriesName)
+
+			// Answer callback query
+			botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+				CallbackQueryID: callbackQuery.ID,
+				Text:            "سریال در لیست مسدودی‌ها یافت نشد",
+				ShowAlert:       false,
+			})
+			return
+		}
+
+		slog.Error("Failed to remove muted series",
+			"chat_id", chatID,
+			"series_name", seriesName,
+			"error", err)
+
+		// Answer callback query with error
+		botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+			CallbackQueryID: callbackQuery.ID,
+			Text:            "خطا در رفع مسدودیت سریال",
+			ShowAlert:       false,
+		})
+		return
+	}
+
+	// Answer callback query
+	botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: callbackQuery.ID,
+		Text:            "✓ رفع مسدودیت شد",
+		ShowAlert:       false,
+	})
+
+	// Send confirmation message
+	confirmationMsg := fmt.Sprintf("✓ %s از لیست مسدودی‌ها حذف شد", seriesName)
+	if err := b.SendMessage(ctx, chatID, confirmationMsg); err != nil {
+		slog.Error("Failed to send confirmation message",
+			"chat_id", chatID,
+			"error", err)
+	}
+
+	// Update button state to show success
+	originalMessage := callbackQuery.Message.Message
+
+	// Create new keyboard with success button
+	successKeyboard := &botModels.InlineKeyboardMarkup{
+		InlineKeyboard: [][]botModels.InlineKeyboardButton{
+			{
+				{
+					Text:         "✓ رفع مسدودیت شد",
+					CallbackData: "unmuted", // Inactive callback data
+				},
+			},
+		},
+	}
+
+	// Edit message to update button
+	_, err = botInstance.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
+		ChatID:      chatID,
+		MessageID:   originalMessage.ID,
+		ReplyMarkup: successKeyboard,
+	})
+	if err != nil {
+		slog.Warn("Failed to edit message markup",
+			"chat_id", chatID,
+			"message_id", originalMessage.ID,
+			"error", err)
+	}
+
+	slog.Info("Successfully unmuted series via undo",
 		"chat_id", chatID,
 		"series_name", seriesName)
 }

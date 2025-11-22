@@ -48,11 +48,35 @@ func (b *Bot) handleStart(ctx context.Context, _ *bot.Bot, update *botModels.Upd
 /search - جستجوی محتوا
 /mutedlist - مشاهده سریال‌های مسدود شده`
 
-	err = b.SendMessage(ctx, chatID, welcomeMessage)
+	// Create inline keyboard with 2x2 button grid
+	keyboard := &botModels.InlineKeyboardMarkup{
+		InlineKeyboard: [][]botModels.InlineKeyboardButton{
+			{
+				{Text: "تازه‌ها", CallbackData: "nav:recent"},
+				{Text: "جستجو", CallbackData: "nav:search"},
+			},
+			{
+				{Text: "سریال‌های مسدود شده", CallbackData: "nav:mutedlist"},
+				{Text: "راهنما", CallbackData: "nav:help"},
+			},
+		},
+	}
+
+	// Send message with inline keyboard
+	err = b.SendMessageWithKeyboard(ctx, chatID, welcomeMessage, keyboard)
 	if err != nil {
-		slog.Error("Failed to send welcome message",
+		slog.Error("Failed to send welcome message with keyboard",
 			"chat_id", chatID,
 			"error", err)
+
+		// Graceful fallback: send plain text message if keyboard fails
+		err = b.SendMessage(ctx, chatID, welcomeMessage)
+		if err != nil {
+			slog.Error("Failed to send fallback welcome message",
+				"chat_id", chatID,
+				"error", err)
+		}
+		return
 	}
 
 	slog.Info("User subscribed successfully",
