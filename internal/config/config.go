@@ -18,8 +18,9 @@ type Config struct {
 
 // TestingConfig holds testing and feature flag configuration
 type TestingConfig struct {
-	TesterChatIDs     []int64 // Chat IDs that can access beta features
+	TesterChatIDs      []int64 // Chat IDs that can access beta features
 	EnableBetaFeatures bool    // Global flag to enable/disable beta features
+	NotifyOnlyTesters  bool    // If true, send ALL notifications only to testers (for debugging)
 }
 
 // TelegramConfig holds Telegram bot configuration
@@ -63,8 +64,9 @@ func LoadConfig() (*Config, error) {
 		},
 		Logger: GetLoggerFromEnv(),
 		Testing: TestingConfig{
-			TesterChatIDs:     getEnvInt64Slice("TESTER_CHAT_IDS", []int64{}),
+			TesterChatIDs:      getEnvInt64Slice("TESTER_CHAT_IDS", []int64{}),
 			EnableBetaFeatures: getEnvBool("ENABLE_BETA_FEATURES", false),
+			NotifyOnlyTesters:  getEnvBool("NOTIFY_ONLY_TESTERS", false),
 		},
 	}
 

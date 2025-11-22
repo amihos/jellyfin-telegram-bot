@@ -113,9 +113,23 @@ func (b *Bot) BroadcastNotification(ctx context.Context, content *NotificationCo
 		return nil
 	}
 
-	// Smart test detection: filter to only testers for test notifications
+	// Check if NotifyOnlyTesters mode is enabled (for debugging/testing)
 	filteredSubscribers := subscribers
-	if len(content.ItemID) >= 5 && content.ItemID[:5] == "test-" {
+	if b.config != nil && b.config.Testing.NotifyOnlyTesters {
+		// Filter ALL notifications to only testers
+		testerSubscribers := make([]int64, 0, len(subscribers))
+		for _, chatID := range subscribers {
+			if b.config.IsTester(chatID) {
+				testerSubscribers = append(testerSubscribers, chatID)
+			}
+		}
+		filteredSubscribers = testerSubscribers
+		slog.Info("NotifyOnlyTesters mode enabled - filtered to testers only",
+			"item_id", content.ItemID,
+			"total_subscribers", len(subscribers),
+			"tester_count", len(testerSubscribers))
+	} else if len(content.ItemID) >= 5 && content.ItemID[:5] == "test-" {
+		// Smart test detection: filter to only testers for test notifications
 		if b.config != nil && b.config.Testing.EnableBetaFeatures {
 			// Filter to only testers
 			testSubscribers := make([]int64, 0, len(subscribers))
