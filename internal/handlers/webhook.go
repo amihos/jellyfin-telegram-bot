@@ -113,9 +113,9 @@ func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Parse webhook payload
 	var payload models.JellyfinWebhook
-	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+	if parseErr := json.Unmarshal(bodyBytes, &payload); parseErr != nil {
 		slog.Error("Failed to parse webhook payload",
-			"error", err,
+			"error", parseErr,
 			"remote_addr", r.RemoteAddr,
 			"raw_body", string(bodyBytes))
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
