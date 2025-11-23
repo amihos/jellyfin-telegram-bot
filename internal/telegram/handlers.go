@@ -8,8 +8,9 @@ import (
 	"log/slog"
 	"strings"
 
-	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	"jellyfin-telegram-bot/internal/i18n"
+
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 
 	"github.com/go-telegram/bot"
 	botModels "github.com/go-telegram/bot/models"
