@@ -16,7 +16,7 @@ import (
 // mockSubscriberDB implements SubscriberDB interface for testing
 type mockSubscriberDB struct {
 	subscribers  []int64
-	languages    map[int64]string // chatID -> languageCode
+	languages    map[int64]string          // chatID -> languageCode
 	mutedSeries  map[int64]map[string]bool // chatID -> seriesID -> isMuted
 	addSubErr    error
 	removeSubErr error

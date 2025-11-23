@@ -14,11 +14,11 @@ import (
 // Mock implementations for testing
 
 type MockSubscriberDB struct {
-	subscribers    map[int64]bool
-	languages      map[int64]string // chatID -> languageCode
-	mutedSeries    map[int64]map[string]bool // chatID -> seriesID -> isMuted
-	shouldFailAdd  bool
-	shouldFailGet  bool
+	subscribers   map[int64]bool
+	languages     map[int64]string          // chatID -> languageCode
+	mutedSeries   map[int64]map[string]bool // chatID -> seriesID -> isMuted
+	shouldFailAdd bool
+	shouldFailGet bool
 }
 
 func NewMockSubscriberDB() *MockSubscriberDB {

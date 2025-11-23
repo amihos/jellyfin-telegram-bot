@@ -471,9 +471,9 @@ func TestHandleStart_ButtonLayout(t *testing.T) {
 func TestHandleStart_PersianLabels(t *testing.T) {
 	buttons := map[string]string{
 		"تازه‌ها":             "nav:recent",
-		"جستجو":              "nav:search",
+		"جستجو":               "nav:search",
 		"سریال‌های مسدود شده": "nav:mutedlist",
-		"راهنما":             "nav:help",
+		"راهنما":              "nav:help",
 	}
 
 	// Verify Persian text is not empty
