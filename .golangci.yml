@@ -19,10 +19,11 @@ linters:
     - goimports
     - misspell
     - unconvert
-    - unparam
     - gocritic
     - gosec
-    - prealloc
+  disable:
+    - unparam  # Produces false positives for interface method implementations
+    - prealloc  # Premature optimization, not critical for correctness
 
 linters-settings:
   errcheck:
@@ -66,12 +67,8 @@ issues:
     - "exitAfterDefer:"
     # Exclude nil check before len (defensive programming)
     - "S1009:"
-    # Exclude prealloc suggestions (premature optimization)
-    - "prealloc:"
     # Exclude empty branch warnings (intentional error handling)
     - "SA9003:"
-    # Exclude unused context parameter warnings
-    - "unparam:.*ctx.*is unused"
     # Allow British spelling "cancelled"
     - "cancelled.*misspelling.*canceled"
   exclude-rules:
@@ -79,7 +76,6 @@ issues:
     - path: _test\.go
       linters:
         - gosec
-        - unparam
         - errcheck
     # Exclude duplicate code check for test files
     - path: _test\.go
