@@ -46,16 +46,20 @@ func (b *Bot) handleStart(ctx context.Context, _ *bot.Bot, update *botModels.Upd
 		return
 	}
 
-	// Detect and save user's language preference
-	detectedLang := i18n.DetectLanguage(telegramLangCode, i18n.SupportedLanguages)
-	if err := b.db.SetLanguage(chatID, detectedLang); err != nil {
-		slog.Warn("Failed to set language preference",
-			"chat_id", chatID,
-			"detected_lang", detectedLang,
-			"error", err)
+	// Only auto-detect and save language if user doesn't have a saved preference
+	savedLang, err := b.db.GetLanguage(chatID)
+	if err != nil || savedLang == "" {
+		// No saved preference, detect from Telegram and save it
+		detectedLang := i18n.DetectLanguage(telegramLangCode, i18n.SupportedLanguages)
+		if err := b.db.SetLanguage(chatID, detectedLang); err != nil {
+			slog.Warn("Failed to set language preference",
+				"chat_id", chatID,
+				"detected_lang", detectedLang,
+				"error", err)
+		}
 	}
 
-	// Get localizer for user
+	// Get localizer for user (will use saved preference if exists)
 	localizer := b.getLocalizerForUser(ctx, chatID, telegramLangCode)
 
 	// Send welcome message
@@ -92,10 +96,16 @@ func (b *Bot) handleStart(ctx context.Context, _ *bot.Bot, update *botModels.Upd
 		return
 	}
 
+	// Get final language for logging
+	finalLang, _ := b.db.GetLanguage(chatID)
+	if finalLang == "" {
+		finalLang = "unknown"
+	}
+
 	slog.Info("User subscribed successfully",
 		"chat_id", chatID,
 		"username", username,
-		"language", detectedLang)
+		"language", finalLang)
 }
 
 // handleRecent handles the /recent command
