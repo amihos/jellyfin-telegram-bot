@@ -8,18 +8,19 @@
 # ============================================
 # Stage 1: Builder
 # ============================================
-FROM golang:1.23-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
+
+# BuildKit platform arguments for cross-compilation
+ARG TARGETOS
+ARG TARGETARCH
 
 # Install build dependencies
-# gcc, musl-dev: Required for CGO (SQLite driver needs CGO)
 # git: For go modules that might need git
 # ca-certificates, tzdata: Will be copied to final image
 RUN apk add --no-cache \
     git \
     ca-certificates \
-    tzdata \
-    gcc \
-    musl-dev
+    tzdata
 
 # Set working directory
 WORKDIR /app
@@ -35,19 +36,17 @@ RUN go mod download && go mod verify
 COPY . .
 
 # Build static binary with optimizations
-# CGO_ENABLED=1: Enable CGO for SQLite driver (go-sqlite3 requires it)
+# CGO_ENABLED=0: Disable CGO for easier cross-compilation
+#   GORM can use pure Go SQLite driver (modernc.org/sqlite) instead of go-sqlite3
+# GOOS/GOARCH: Use BuildKit's platform arguments for multi-arch support
 # -a: Force rebuilding of packages
-# -installsuffix cgo: Add suffix to package directory to keep separate from default builds
 # -ldflags: Link flags for optimization
 #   -w: Disable DWARF generation (removes debugging symbols)
 #   -s: Disable symbol table
-#   -linkmode external: Use external linker for better static linking with CGO
-#   -extldflags "-static": Create fully static binary
-# Note: We use CGO for SQLite but still create a portable binary via musl-dev
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
+#   -X main.version=docker: Set version string
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
     -a \
-    -installsuffix cgo \
-    -ldflags="-w -s -linkmode external -extldflags '-static' -X main.version=docker" \
+    -ldflags="-w -s -X main.version=docker" \
     -o jellyfin-telegram-bot \
     ./cmd/bot
 
@@ -136,6 +135,7 @@ ENTRYPOINT ["/app/jellyfin-telegram-bot"]
 # ============================================
 # Technical Notes
 # ============================================
-# CGO is enabled for SQLite compatibility (go-sqlite3 requires it)
-# The binary is still static thanks to musl-dev and -extldflags '-static'
-# This approach balances portability with SQLite functionality
+# CGO is disabled for easier cross-compilation and smaller binaries
+# GORM will automatically use a pure Go SQLite driver (modernc.org/sqlite)
+# The resulting binary is fully static and works across architectures
+# Multi-arch builds use BuildKit's TARGETOS/TARGETARCH arguments
