@@ -2,6 +2,8 @@ package telegram
 
 import (
 	"testing"
+
+	"jellyfin-telegram-bot/internal/i18n"
 )
 
 // Test 1: nav:recent callback triggers same behavior as /recent command
@@ -9,9 +11,15 @@ func TestNavigationCallback_Recent_FetchesRecentItems(t *testing.T) {
 	mockDB := NewMockSubscriberDB()
 	mockJellyfin := NewMockJellyfinClient()
 
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		t.Fatalf("Failed to initialize i18n bundle: %v", err)
+	}
+
 	botInstance := &Bot{
 		db:             mockDB,
 		jellyfinClient: mockJellyfin,
+		i18nBundle:     bundle,
 	}
 
 	// Verify that recent items can be fetched successfully
@@ -29,9 +37,15 @@ func TestNavigationCallback_MutedList_GetsMutedSeries(t *testing.T) {
 	mockDB := NewMockSubscriberDB()
 	mockJellyfin := NewMockJellyfinClient()
 
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		t.Fatalf("Failed to initialize i18n bundle: %v", err)
+	}
+
 	botInstance := &Bot{
 		db:             mockDB,
 		jellyfinClient: mockJellyfin,
+		i18nBundle:     bundle,
 	}
 
 	chatID := int64(12345)
@@ -58,25 +72,31 @@ func TestNavigationCallback_Help_DisplaysHelpMessage(t *testing.T) {
 	mockDB := NewMockSubscriberDB()
 	mockJellyfin := NewMockJellyfinClient()
 
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		t.Fatalf("Failed to initialize i18n bundle: %v", err)
+	}
+
 	botInstance := &Bot{
 		db:             mockDB,
 		jellyfinClient: mockJellyfin,
+		i18nBundle:     bundle,
 	}
 
 	// Verify help message would be generated (testing the logic)
-	helpMessage := `دستورات موجود:
-/start - عضویت در ربات
-/recent - مشاهده محتوای اخیر
-/search - جستجوی محتوا (مثال: /search interstellar)
-/mutedlist - مشاهده سریال‌های مسدود شده`
+	helpMessage := `Available commands:
+/start - Subscribe to the bot
+/recent - View recent content
+/search - Search for content (example: /search interstellar)
+/mutedlist - View muted series`
 
 	if helpMessage == "" {
 		t.Error("Expected non-empty help message")
 	}
 
-	// Check for Persian text
-	if !contains(helpMessage, "دستورات موجود") {
-		t.Error("Help message should contain 'دستورات موجود'")
+	// Check for text
+	if !contains(helpMessage, "Available commands") {
+		t.Error("Help message should contain 'Available commands'")
 	}
 
 	// Prevent unused variable warning
@@ -88,21 +108,27 @@ func TestNavigationCallback_Search_DisplaysSearchInstructions(t *testing.T) {
 	mockDB := NewMockSubscriberDB()
 	mockJellyfin := NewMockJellyfinClient()
 
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		t.Fatalf("Failed to initialize i18n bundle: %v", err)
+	}
+
 	botInstance := &Bot{
 		db:             mockDB,
 		jellyfinClient: mockJellyfin,
+		i18nBundle:     bundle,
 	}
 
 	// Verify search instructions would be generated
-	searchInstructions := "لطفاً عبارت جستجو را وارد کنید. مثال: /search interstellar"
+	searchInstructions := "Please enter your search query. Example: /search interstellar"
 
 	if searchInstructions == "" {
 		t.Error("Expected non-empty search instructions")
 	}
 
-	// Check for Persian text
-	if !contains(searchInstructions, "لطفاً عبارت جستجو را وارد کنید") {
-		t.Error("Search instructions should contain Persian text")
+	// Check for text
+	if !contains(searchInstructions, "Please enter") {
+		t.Error("Search instructions should contain text")
 	}
 
 	// Prevent unused variable warning
@@ -185,9 +211,15 @@ func TestNavigationCallback_InvalidCallbackData(t *testing.T) {
 	mockDB := NewMockSubscriberDB()
 	mockJellyfin := NewMockJellyfinClient()
 
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		t.Fatalf("Failed to initialize i18n bundle: %v", err)
+	}
+
 	botInstance := &Bot{
 		db:             mockDB,
 		jellyfinClient: mockJellyfin,
+		i18nBundle:     bundle,
 	}
 
 	// Test invalid callback data
@@ -226,9 +258,15 @@ func TestNavigationCallback_MutedList_EmptyList(t *testing.T) {
 	mockDB := NewMockSubscriberDB()
 	mockJellyfin := NewMockJellyfinClient()
 
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		t.Fatalf("Failed to initialize i18n bundle: %v", err)
+	}
+
 	botInstance := &Bot{
 		db:             mockDB,
 		jellyfinClient: mockJellyfin,
+		i18nBundle:     bundle,
 	}
 
 	chatID := int64(12345)
@@ -254,9 +292,15 @@ func TestNavigationCallback_Recent_EmptyList(t *testing.T) {
 	// Set empty recent items
 	mockJellyfin.recentItems = []ContentItem{}
 
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		t.Fatalf("Failed to initialize i18n bundle: %v", err)
+	}
+
 	botInstance := &Bot{
 		db:             mockDB,
 		jellyfinClient: mockJellyfin,
+		i18nBundle:     bundle,
 	}
 
 	// Verify empty list is handled

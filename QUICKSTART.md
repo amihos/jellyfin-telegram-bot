@@ -35,14 +35,14 @@
 Open the `.env` file and replace these 3 values:
 
 ```bash
-# 1. Paste your bot token here:
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz-123456789
+# 1. Paste your bot token here (get from @BotFather):
+TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
 
 # 2. Your Jellyfin server URL:
-JELLYFIN_SERVER_URL=http://192.168.1.100:8096
+JELLYFIN_SERVER_URL=http://your-server-ip:8096
 
 # 3. Your Jellyfin API key (get from Dashboard → API Keys):
-JELLYFIN_API_KEY=abc123def456ghi789jkl012mno345pqr678
+JELLYFIN_API_KEY=YOUR_JELLYFIN_API_KEY_HERE
 ```
 
 **Don't have Jellyfin yet?** You can still test the bot! Just use fake values for now.

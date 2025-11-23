@@ -139,9 +139,9 @@ Create a `.env` file in the application directory:
 
 ```env
 # Required
-TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
-JELLYFIN_SERVER_URL=http://192.168.1.100:8096
-JELLYFIN_API_KEY=abc123def456ghi789jkl
+TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
+JELLYFIN_SERVER_URL=http://your-server-ip:8096
+JELLYFIN_API_KEY=YOUR_JELLYFIN_API_KEY_HERE
 
 # Optional
 WEBHOOK_SECRET=my-secure-secret-token

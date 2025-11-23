@@ -6,17 +6,21 @@
 ┌─────────────────────────────────────────────────────────┐
 │                                                         │
 │   Windows (Jellyfin Server)                            │
-│   IP: 10.255.255.254                                   │
+│   IP: <WINDOWS_IP>                                     │
 │   Port: 8096                                            │
 │                                                         │
 │         ↓ sends webhooks to ↓                          │
 │                                                         │
 │   WSL (Telegram Bot)                                   │
-│   IP: 172.31.143.209                                   │
+│   IP: <WSL_IP>                                         │
 │   Port: 8080                                            │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
+
+**To find your IPs:**
+- Windows IP: Run `ipconfig` in Windows and look for "vEthernet (WSL)"
+- WSL IP: Run `hostname -I` in WSL terminal
 
 ---
 
@@ -30,10 +34,7 @@
 4. Click the **"+"** button (top right)
 5. Enter a name: `Telegram Bot`
 6. Click **OK**
-7. **COPY the API key** - it looks like this:
-   ```
-   a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-   ```
+7. **COPY the API key** - it will be a long string of random characters
 
 ### Save the API Key:
 
@@ -45,12 +46,12 @@ nano .env
 
 Replace this line:
 ```
-JELLYFIN_API_KEY=PASTE_YOUR_API_KEY_HERE
+JELLYFIN_API_KEY=YOUR_JELLYFIN_API_KEY_HERE
 ```
 
 With your actual key:
 ```
-JELLYFIN_API_KEY=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+JELLYFIN_API_KEY=<paste_your_actual_api_key_here>
 ```
 
 Save (Ctrl+O, Enter, Ctrl+X)
@@ -68,21 +69,23 @@ Click **"Add Generic Destination"** and configure:
 | Field | Value |
 |-------|-------|
 | **Webhook Name** | `Telegram Bot` |
-| **Webhook URL** | `http://172.31.143.209:8080/webhook` |
+| **Webhook URL** | `http://<WSL_IP>:8080/webhook` |
 | **Notification Type** | ✅ **Item Added** (check this box) |
 | **Item Type** | ✅ **Movies** and ✅ **Episodes** |
 | **Status** | ✅ **Enable** (check this box) |
 
+**Replace `<WSL_IP>` with your actual WSL IP address** (get it by running `hostname -I` in WSL)
+
 ### Optional Settings:
 
 - **Request Content Type**: `application/json` (default)
-- **Webhook Secret**: `my-webhook-secret-123` (add as custom header if available)
+- **Webhook Secret**: `your-secret-token` (add as custom header if available)
   - Header name: `X-Webhook-Secret`
-  - Header value: `my-webhook-secret-123`
+  - Header value: `your-secret-token`
 
 ### Important Notes:
 
-⚠️  **Use WSL IP**: `172.31.143.209` (not localhost!)
+⚠️  **Use WSL IP**: Not localhost! Get it with `hostname -I` in WSL
 ⚠️  **Check "Item Added"** - This is the notification type
 ⚠️  **Check Movies and Episodes** - These are the content types
 
@@ -103,7 +106,7 @@ sleep 2
 nohup ./jellyfin-bot > logs/bot.log 2>&1 &
 
 # Check it's running
-./monitor.sh
+ps aux | grep jellyfin-bot
 ```
 
 ---
@@ -113,8 +116,8 @@ nohup ./jellyfin-bot > logs/bot.log 2>&1 &
 ### Test 1: Check if Jellyfin is reachable from WSL
 
 ```bash
-# This should return Jellyfin's web page
-curl -s http://10.255.255.254:8096 | head -20
+# Replace <WINDOWS_IP> with your actual Windows IP
+curl -s http://<WINDOWS_IP>:8096 | head -20
 ```
 
 If you see HTML output, ✅ connection works!
@@ -124,9 +127,10 @@ If you see HTML output, ✅ connection works!
 Open PowerShell or Command Prompt in Windows and run:
 
 ```powershell
-curl -X POST http://172.31.143.209:8080/webhook `
+# Replace <WSL_IP> with your actual WSL IP
+curl -X POST http://<WSL_IP>:8080/webhook `
   -H "Content-Type: application/json" `
-  -H "X-Webhook-Secret: my-webhook-secret-123" `
+  -H "X-Webhook-Secret: your-secret-token" `
   -d '{\"NotificationType\":\"ItemAdded\",\"ItemType\":\"Movie\",\"ItemName\":\"Test Movie\",\"ItemId\":\"test-123\"}'
 ```
 
@@ -173,15 +177,15 @@ curl http://localhost:8080/health
 
 ## 📊 Verify Everything is Working
 
-Run this command in WSL:
+Check the bot logs:
 
 ```bash
-./monitor.sh
+tail -f logs/bot.log
 ```
 
 You should see:
-- ✅ Bot Status: RUNNING
-- ✅ Webhook Health: OK
+- ✅ Bot connected to Telegram
+- ✅ Webhook server running on port 8080
 - 👥 Active Subscribers: 1+ (after you send /start to bot)
 
 ---
@@ -200,35 +204,40 @@ You should see:
 
 ```bash
 # WSL Bot IP (for Jellyfin webhook)
-WSL_IP=172.31.143.209
+# Get with: hostname -I
+WSL_IP=<your_wsl_ip>
 
 # Windows Jellyfin IP (for bot to call)
-JELLYFIN_IP=10.255.255.254
+# Get with: ipconfig in Windows, look for vEthernet (WSL)
+WINDOWS_IP=<your_windows_ip>
 
 # Webhook URL (use in Jellyfin)
-http://172.31.143.209:8080/webhook
+http://<WSL_IP>:8080/webhook
 
 # Jellyfin URL (already in .env)
-http://10.255.255.254:8096
+http://<WINDOWS_IP>:8096
 ```
 
 ### Useful Commands:
 
 ```bash
+# Find your WSL IP
+hostname -I
+
 # Restart bot
 pkill jellyfin-bot && sleep 2 && nohup ./jellyfin-bot > logs/bot.log 2>&1 &
 
 # Check status
-./monitor.sh
+ps aux | grep jellyfin-bot
 
 # Watch logs
 tail -f logs/bot.log
 
-# Test from WSL
-./test-webhook.sh
+# Test webhook locally
+./scripts/send-test-notification.sh
 
 # Check Jellyfin connection
-curl http://10.255.255.254:8096
+curl http://<WINDOWS_IP>:8096
 ```
 
 ---
@@ -237,7 +246,7 @@ curl http://10.255.255.254:8096
 
 1. Check logs: `tail -f logs/bot.log`
 2. Test health: `curl http://localhost:8080/health`
-3. Verify network: `ping 10.255.255.254`
+3. Verify network: `ping <WINDOWS_IP>`
 4. Check Jellyfin logs in Dashboard → Logs
 
 ---
@@ -246,10 +255,11 @@ curl http://10.255.255.254:8096
 
 - [ ] Got Jellyfin API key from Dashboard
 - [ ] Updated `.env` with API key
+- [ ] Found WSL IP with `hostname -I`
 - [ ] Configured webhook in Jellyfin with WSL IP
 - [ ] Restarted the bot
 - [ ] Sent /start to bot in Telegram
-- [ ] Tested webhook with `./test-webhook.sh`
+- [ ] Tested webhook with `./scripts/send-test-notification.sh`
 - [ ] Added content to Jellyfin and got notification
 
 ---

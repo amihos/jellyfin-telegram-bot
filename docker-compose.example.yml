@@ -1,0 +1,126 @@
+# Docker Compose configuration for Jellyfin Telegram Bot
+#
+# Copy this file to docker-compose.yml and customize the environment variables
+#
+# Quick start:
+#   1. Copy this file: cp docker-compose.example.yml docker-compose.yml
+#   2. Create .env file with your credentials (see .env.example)
+#   3. Start the bot: docker-compose up -d
+#   4. View logs: docker-compose logs -f
+#   5. Stop the bot: docker-compose down
+
+version: '3.8'
+
+services:
+  jellyfin-telegram-bot:
+    # Use the latest pre-built image from GitHub Container Registry
+    # Replace 'yourusername' with the actual GitHub username/organization
+    image: ghcr.io/yourusername/jellyfin-telegram-bot:latest
+
+    # Or build from source (uncomment the following lines and comment out 'image' above)
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+
+    container_name: jellyfin-telegram-bot
+
+    # Restart policy: automatically restart unless explicitly stopped
+    restart: unless-stopped
+
+    # Environment variables - OPTION 1: Load from .env file (recommended)
+    env_file:
+      - .env
+
+    # Environment variables - OPTION 2: Set directly (less secure, not recommended)
+    # Uncomment and fill in your values if you don't want to use a .env file
+    # environment:
+    #   - TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+    #   - JELLYFIN_SERVER_URL=http://your-jellyfin-server:8096
+    #   - JELLYFIN_API_KEY=your_jellyfin_api_key_here
+    #   - PORT=8080
+    #   - WEBHOOK_SECRET=
+    #   - DATABASE_PATH=/app/data/bot.db
+    #   - LOG_LEVEL=INFO
+    #   - LOG_FILE=/app/logs/bot.log
+
+    # Port mapping
+    # Format: HOST_PORT:CONTAINER_PORT
+    # The webhook endpoint will be available at http://your-server-ip:8080/webhook
+    ports:
+      - "8080:8080"
+
+    # Volume mounts for data persistence
+    volumes:
+      # Database persistence - stores subscriber data and content cache
+      - ./data:/app/data
+
+      # Log file persistence - stores bot logs
+      - ./logs:/app/logs
+
+      # Optional: Mount custom locale files if you've added translations
+      # - ./locales:/app/locales:ro
+
+    # Health check to monitor bot status
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Network configuration
+    # Create a custom network if you want to isolate the bot
+    # or connect it to other services (e.g., Jellyfin container)
+    # networks:
+    #   - jellyfin-network
+
+# Optional: Define custom networks
+# networks:
+#   jellyfin-network:
+#     driver: bridge
+
+# Notes:
+#
+# 1. Data Persistence:
+#    - ./data directory stores the SQLite database
+#    - ./logs directory stores log files
+#    - These directories will be created automatically if they don't exist
+#    - Make sure they have proper permissions (readable/writable by container user)
+#
+# 2. Webhook Configuration:
+#    - The bot listens on port 8080 by default (configurable via PORT env var)
+#    - Configure Jellyfin webhook to point to: http://your-server-ip:8080/webhook
+#    - If running on same host as Jellyfin: http://host.docker.internal:8080/webhook
+#
+# 3. Updating:
+#    - Pull latest image: docker-compose pull
+#    - Restart with new image: docker-compose up -d
+#    - Your data and logs will persist across updates
+#
+# 4. Logs:
+#    - View logs: docker-compose logs -f
+#    - View logs with timestamp: docker-compose logs -f -t
+#    - View last 100 lines: docker-compose logs --tail=100 -f
+#
+# 5. Troubleshooting:
+#    - Check container status: docker-compose ps
+#    - Check container health: docker inspect --format='{{.State.Health.Status}}' jellyfin-telegram-bot
+#    - Access container shell: docker-compose exec jellyfin-telegram-bot sh
+#    - Stop and remove containers: docker-compose down
+#    - Rebuild from source: docker-compose build --no-cache
+#
+# 6. Security:
+#    - Never commit .env file to version control
+#    - Use WEBHOOK_SECRET to validate incoming webhooks
+#    - Keep your Telegram bot token and Jellyfin API key secret
+#    - Consider running behind a reverse proxy (nginx, traefik) for HTTPS
+#
+# 7. Resource Limits (optional):
+#    - Uncomment to limit CPU and memory usage:
+#    # deploy:
+#    #   resources:
+#    #     limits:
+#    #       cpus: '0.5'
+#    #       memory: 128M
+#    #     reservations:
+#    #       memory: 64M

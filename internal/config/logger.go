@@ -73,7 +73,7 @@ func SetupLogger(config LoggerConfig) *slog.Logger {
 
 	// Create JSON handler with appropriate log level
 	handler := slog.NewJSONHandler(multiWriter, &slog.HandlerOptions{
-		Level: level,
+		Level:     level,
 		AddSource: level == slog.LevelDebug, // add source location for debug logs
 	})
 

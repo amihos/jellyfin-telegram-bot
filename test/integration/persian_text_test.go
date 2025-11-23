@@ -7,9 +7,21 @@ import (
 	"strings"
 	"testing"
 
+	"jellyfin-telegram-bot/internal/i18n"
 	"jellyfin-telegram-bot/internal/jellyfin"
 	"jellyfin-telegram-bot/internal/telegram"
+
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 )
+
+// Helper function to get Persian localizer for testing
+func getPersianLocalizer() *goi18n.Localizer {
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		return nil
+	}
+	return goi18n.NewLocalizer(bundle, "fa")
+}
 
 // TestPersianCharacterSearch tests searching with Persian characters
 func TestPersianCharacterSearch(t *testing.T) {
@@ -54,6 +66,11 @@ func TestPersianCharacterSearch(t *testing.T) {
 
 // TestPersianNotificationFormatting tests that Persian notification messages are formatted correctly
 func TestPersianNotificationFormatting(t *testing.T) {
+	localizer := getPersianLocalizer()
+	if localizer == nil {
+		t.Fatal("Failed to initialize Persian localizer")
+	}
+
 	tests := []struct {
 		name     string
 		content  telegram.NotificationContent
@@ -100,8 +117,8 @@ func TestPersianNotificationFormatting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Format notification message
-			message := telegram.FormatNotification(&tt.content)
+			// Format notification message with Persian localizer
+			message := telegram.FormatNotification(&tt.content, localizer)
 
 			// Verify all expected strings are present
 			for _, expected := range tt.expected {
@@ -120,6 +137,11 @@ func TestPersianNotificationFormatting(t *testing.T) {
 
 // TestRTLFormatting tests that Right-to-Left formatting works correctly with mixed content
 func TestRTLFormatting(t *testing.T) {
+	localizer := getPersianLocalizer()
+	if localizer == nil {
+		t.Fatal("Failed to initialize Persian localizer")
+	}
+
 	// Create a notification content item with mixed Persian and English
 	content := telegram.NotificationContent{
 		ItemID:   "test-1",
@@ -130,7 +152,7 @@ func TestRTLFormatting(t *testing.T) {
 		Year:     1999,
 	}
 
-	message := telegram.FormatNotification(&content)
+	message := telegram.FormatNotification(&content, localizer)
 
 	// Verify both Persian and English text are present
 	if !strings.Contains(message, "The Matrix") {

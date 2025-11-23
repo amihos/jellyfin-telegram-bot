@@ -113,9 +113,9 @@ func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Parse webhook payload
 	var payload models.JellyfinWebhook
-	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+	if parseErr := json.Unmarshal(bodyBytes, &payload); parseErr != nil {
 		slog.Error("Failed to parse webhook payload",
-			"error", err,
+			"error", parseErr,
 			"remote_addr", r.RemoteAddr,
 			"raw_body", string(bodyBytes))
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
@@ -201,11 +201,11 @@ func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		content := &NotificationContent{
 			ItemID:        payload.ItemID,
 			Type:          contentType,
-			Title:         metadata.Title,  // Use metadata.Title which has "Unknown" fallback
-			Overview:      metadata.Overview,  // Use metadata.Overview for consistency
+			Title:         metadata.Title,    // Use metadata.Title which has "Unknown" fallback
+			Overview:      metadata.Overview, // Use metadata.Overview for consistency
 			Year:          payload.Year,
-			Rating:        0, // Webhook doesn't include rating - could fetch from API if needed
-			SeriesName:    metadata.SeriesName,  // Use metadata.SeriesName for "Unknown Series" fallback
+			Rating:        0,                   // Webhook doesn't include rating - could fetch from API if needed
+			SeriesName:    metadata.SeriesName, // Use metadata.SeriesName for "Unknown Series" fallback
 			SeasonNumber:  payload.SeasonNumber,
 			EpisodeNumber: payload.EpisodeNumber,
 		}

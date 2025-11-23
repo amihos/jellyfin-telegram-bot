@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -39,14 +40,17 @@ func TestWebhookToNotificationPipeline(t *testing.T) {
 		Title    string
 		ItemType string
 	}
+	var mu sync.Mutex
 	var broadcastCalls []BroadcastCall
 	mockBroadcaster := &mockBroadcaster{
 		broadcastFunc: func(ctx context.Context, content *handlers.NotificationContent) error {
+			mu.Lock()
 			broadcastCalls = append(broadcastCalls, BroadcastCall{
 				ItemID:   content.ItemID,
 				Title:    content.Title,
 				ItemType: content.Type,
 			})
+			mu.Unlock()
 			return nil
 		},
 	}
@@ -87,12 +91,17 @@ func TestWebhookToNotificationPipeline(t *testing.T) {
 	}
 
 	// Verify broadcast was called
-	if len(broadcastCalls) != 1 {
-		t.Fatalf("Expected 1 broadcast call, got %d", len(broadcastCalls))
+	mu.Lock()
+	callCount := len(broadcastCalls)
+	var call BroadcastCall
+	if callCount > 0 {
+		call = broadcastCalls[0]
 	}
+	mu.Unlock()
 
-	// Verify broadcast content
-	call := broadcastCalls[0]
+	if callCount != 1 {
+		t.Fatalf("Expected 1 broadcast call, got %d", callCount)
+	}
 	if call.ItemID != "test-item-123" {
 		t.Errorf("Expected ItemID 'test-item-123', got '%s'", call.ItemID)
 	}
@@ -131,10 +140,13 @@ func TestWebhookDuplicatePrevention(t *testing.T) {
 	}
 
 	// Create a mock broadcaster that counts calls
+	var mu2 sync.Mutex
 	callCount := 0
 	mockBroadcaster := &mockBroadcaster{
 		broadcastFunc: func(ctx context.Context, content *handlers.NotificationContent) error {
+			mu2.Lock()
 			callCount++
+			mu2.Unlock()
 			return nil
 		},
 	}
@@ -174,8 +186,12 @@ func TestWebhookDuplicatePrevention(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify only one broadcast occurred
-	if callCount != 1 {
-		t.Errorf("Expected 1 broadcast call for duplicate webhooks, got %d", callCount)
+	mu2.Lock()
+	count := callCount
+	mu2.Unlock()
+
+	if count != 1 {
+		t.Errorf("Expected 1 broadcast call for duplicate webhooks, got %d", count)
 	}
 }
 
@@ -201,13 +217,16 @@ func TestEpisodeNotificationFlow(t *testing.T) {
 		Title    string
 		ItemType string
 	}
+	var mu3 sync.Mutex
 	var broadcastCalls []BroadcastCall
 	mockBroadcaster := &mockBroadcaster{
 		broadcastFunc: func(ctx context.Context, content *handlers.NotificationContent) error {
+			mu3.Lock()
 			broadcastCalls = append(broadcastCalls, BroadcastCall{
 				Title:    content.Title,
 				ItemType: content.Type,
 			})
+			mu3.Unlock()
 			return nil
 		},
 	}
@@ -249,12 +268,19 @@ func TestEpisodeNotificationFlow(t *testing.T) {
 	}
 
 	// Verify broadcast was called
-	if len(broadcastCalls) != 1 {
-		t.Fatalf("Expected 1 broadcast call, got %d", len(broadcastCalls))
+	mu3.Lock()
+	callCount := len(broadcastCalls)
+	var call BroadcastCall
+	if callCount > 0 {
+		call = broadcastCalls[0]
+	}
+	mu3.Unlock()
+
+	if callCount != 1 {
+		t.Fatalf("Expected 1 broadcast call, got %d", callCount)
 	}
 
 	// Verify episode notification
-	call := broadcastCalls[0]
 	if call.ItemType != "Episode" {
 		t.Errorf("Expected ItemType 'Episode', got '%s'", call.ItemType)
 	}

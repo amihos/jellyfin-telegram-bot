@@ -1,0 +1,239 @@
+# English translations for Jellyfin Telegram Bot
+
+# Welcome and start messages
+[welcome.message]
+description = "Welcome message when user subscribes"
+other = """Hello! Welcome to the Jellyfin notification bot.
+
+You will now receive notifications for new content.
+
+Available commands:
+/start - Subscribe to the bot
+/recent - View recent content
+/search - Search for content
+/mutedlist - View muted series
+/language - Change language"""
+
+# Help messages
+[help.message]
+description = "Help message showing available commands"
+other = """Available commands:
+/start - Subscribe to the bot
+/recent - View recent content
+/search - Search for content (example: /search interstellar)
+/mutedlist - View muted series
+/language - Change language"""
+
+[help.invalid_command]
+description = "Message for invalid/unknown commands"
+other = """Invalid command.
+
+Available commands:
+/start - Subscribe to the bot
+/recent - View recent content
+/search - Search for content (example: /search interstellar)
+/mutedlist - View muted series
+/language - Change language"""
+
+# Command descriptions (for Telegram menu)
+[command.start.description]
+description = "Description for /start command"
+other = "Subscribe to the bot"
+
+[command.recent.description]
+description = "Description for /recent command"
+other = "View recent content"
+
+[command.search.description]
+description = "Description for /search command"
+other = "Search for content"
+
+[command.mutedlist.description]
+description = "Description for /mutedlist command"
+other = "View muted series"
+
+[command.language.description]
+description = "Description for /language command"
+other = "Change language"
+
+# Inline keyboard buttons
+[button.recent]
+description = "Recent content button"
+other = "Recent"
+
+[button.search]
+description = "Search button"
+other = "Search"
+
+[button.mutedlist]
+description = "Muted series button"
+other = "Muted Series"
+
+[button.help]
+description = "Help button"
+other = "Help"
+
+[button.mute]
+description = "Mute series button"
+other = "Don't Follow"
+
+[button.muted]
+description = "Already muted indicator"
+other = "✓ Muted"
+
+[button.unmute]
+description = "Unmute series button template"
+other = "Unmute: {{.SeriesName}}"
+
+[button.undo_mute]
+description = "Undo mute button"
+other = "Unmute"
+
+# Language selection
+[language.select]
+description = "Language selection prompt"
+other = "Please select your preferred language:"
+
+[language.selected]
+description = "Language changed confirmation"
+other = "✓ Language changed to English"
+
+[language.button.english]
+description = "English language button"
+other = "English 🇬🇧"
+
+[language.button.persian]
+description = "Persian language button"
+other = "Persian 🇮🇷"
+
+# Recent content
+[recent.error]
+description = "Error fetching recent content"
+other = "Error fetching recent content. Please try again later."
+
+[recent.no_results]
+description = "No recent content found"
+other = "No recent content found"
+
+# Search
+[search.prompt]
+description = "Search usage instructions"
+other = "Please enter a search query. Example: /search interstellar"
+
+[search.error]
+description = "Error during search"
+other = "Error searching for content. Please try again later."
+
+[search.no_results]
+description = "No search results found"
+other = "No results found for '{{.Query}}'"
+
+# Muted list
+[mutedlist.title]
+description = "Muted series list title"
+other = "Muted series:"
+
+[mutedlist.empty]
+description = "No muted series message"
+other = "You have not muted any series"
+
+[mutedlist.error]
+description = "Error fetching muted list"
+other = "Error fetching muted series list. Please try again later."
+
+# Mute/Unmute actions
+[mute.success]
+description = "Series muted successfully"
+other = "✓ You will no longer receive notifications for {{.SeriesName}}"
+
+[mute.error]
+description = "Error muting series"
+other = "Error muting series"
+
+[mute.callback_success]
+description = "Callback response for successful mute"
+other = "✓ Muted"
+
+[unmute.success]
+description = "Series unmuted successfully"
+other = "✓ {{.SeriesName}} removed from muted list"
+
+[unmute.error]
+description = "Error unmuting series"
+other = "Error unmuting series"
+
+[unmute.not_found]
+description = "Series not found in muted list"
+other = "Series not found in muted list"
+
+[unmute.callback_success]
+description = "Callback response for successful unmute"
+other = "✓ Unmuted"
+
+# Notification headers
+[notification.movie.header]
+description = "Movie notification header"
+other = "🎬 New Movie"
+
+[notification.episode.header]
+description = "Episode notification header"
+other = "📺 New Episode"
+
+# Content display fields
+[content.field.movie]
+description = "Movie type indicator"
+other = "🎬 Movie"
+
+[content.field.episode]
+description = "Episode type indicator"
+other = "📺 Episode"
+
+[content.field.name]
+description = "Name/Title field label"
+other = "Title: {{.Name}}"
+
+[content.field.series]
+description = "Series name field label"
+other = "Series: {{.SeriesName}}"
+
+[content.field.episode_number]
+description = "Episode number format"
+other = "Season {{.SeasonNumber}} - Episode {{.EpisodeNumber}}"
+
+[content.field.episode_name]
+description = "Episode name field label"
+other = "Episode Title: {{.Name}}"
+
+[content.field.year]
+description = "Production year field label"
+other = "Year: {{.Year}}"
+
+[content.field.description]
+description = "Description field label"
+other = "Description: {{.Description}}"
+
+[content.field.rating]
+description = "Rating field label"
+other = "Rating: {{.Rating}}/10"
+
+[content.field.official_rating]
+description = "Official rating field label"
+other = "Rated: {{.Rating}}"
+
+# Generic error messages
+[error.generic]
+description = "Generic error message"
+other = "An error occurred. Please try again."
+
+[error.request_processing]
+description = "Error processing request"
+other = "Error processing request"
+
+[error.invalid_callback]
+description = "Invalid callback data"
+other = "Invalid command"
+
+# Navigation callbacks
+[nav.error]
+description = "Navigation error message"
+other = "Error processing request"

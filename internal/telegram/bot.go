@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package telegram
 
 import (
@@ -7,10 +9,12 @@ import (
 	"log/slog"
 
 	"jellyfin-telegram-bot/internal/config"
+	"jellyfin-telegram-bot/internal/i18n"
 	"jellyfin-telegram-bot/pkg/models"
 
 	"github.com/go-telegram/bot"
 	botModels "github.com/go-telegram/bot/models"
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // Bot represents the Telegram bot instance
@@ -19,6 +23,7 @@ type Bot struct {
 	db             SubscriberDB
 	jellyfinClient JellyfinClient
 	config         *config.Config
+	i18nBundle     *goi18n.Bundle
 }
 
 // SubscriberDB defines the interface for subscriber operations
@@ -27,6 +32,9 @@ type SubscriberDB interface {
 	RemoveSubscriber(chatID int64) error
 	GetAllActiveSubscribers() ([]int64, error)
 	IsSubscribed(chatID int64) (bool, error)
+	// Language operations
+	SetLanguage(chatID int64, languageCode string) error
+	GetLanguage(chatID int64) (string, error)
 	// Mute operations
 	AddMutedSeries(chatID int64, seriesID string, seriesName string) error
 	RemoveMutedSeries(chatID int64, seriesID string) error
@@ -61,22 +69,31 @@ func NewBot(token string, db SubscriberDB, jellyfinClient JellyfinClient, cfg *c
 		return nil, fmt.Errorf("TELEGRAM_BOT_TOKEN is required")
 	}
 
+	// Initialize i18n bundle
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize i18n: %w", err)
+	}
+
 	botInstance := &Bot{
 		db:             db,
 		jellyfinClient: jellyfinClient,
 		config:         cfg,
+		i18nBundle:     bundle,
 	}
 
 	opts := []bot.Option{
-		bot.WithDefaultHandler(defaultHandler),
+		bot.WithDefaultHandler(botInstance.defaultHandler),
 		bot.WithMessageTextHandler("/start", bot.MatchTypeExact, botInstance.handleStart),
 		bot.WithMessageTextHandler("/recent", bot.MatchTypeExact, botInstance.handleRecent),
 		bot.WithMessageTextHandler("/search", bot.MatchTypePrefix, botInstance.handleSearch),
 		bot.WithMessageTextHandler("/mutedlist", bot.MatchTypeExact, botInstance.handleMutedList),
+		bot.WithMessageTextHandler("/language", bot.MatchTypeExact, botInstance.handleLanguage),
 		bot.WithCallbackQueryDataHandler("nav:", bot.MatchTypePrefix, botInstance.handleNavigationCallback),
 		bot.WithCallbackQueryDataHandler("mute:", bot.MatchTypePrefix, botInstance.handleMuteCallback),
 		bot.WithCallbackQueryDataHandler("undo_mute:", bot.MatchTypePrefix, botInstance.handleUndoMuteCallback),
 		bot.WithCallbackQueryDataHandler("unmute:", bot.MatchTypePrefix, botInstance.handleUnmuteCallback),
+		bot.WithCallbackQueryDataHandler("lang:", bot.MatchTypePrefix, botInstance.handleLanguageCallback),
 	}
 
 	b, err := bot.New(token, opts...)
@@ -101,22 +118,30 @@ func NewBot(token string, db SubscriberDB, jellyfinClient JellyfinClient, cfg *c
 
 // registerBotCommands registers bot commands with Telegram for Menu Button integration
 func (b *Bot) registerBotCommands(ctx context.Context) error {
+	// For now, register commands in English
+	// TODO: Support per-user language for commands (requires BotCommandScope)
+	localizer := i18n.GetLocalizer(b.i18nBundle, "en")
+
 	commands := []botModels.BotCommand{
 		{
 			Command:     "start",
-			Description: "عضویت در ربات",
+			Description: i18n.T(localizer, "command.start.description"),
 		},
 		{
 			Command:     "recent",
-			Description: "مشاهده محتوای اخیر",
+			Description: i18n.T(localizer, "command.recent.description"),
 		},
 		{
 			Command:     "search",
-			Description: "جستجوی محتوا",
+			Description: i18n.T(localizer, "command.search.description"),
 		},
 		{
 			Command:     "mutedlist",
-			Description: "مشاهده سریال‌های مسدود شده",
+			Description: i18n.T(localizer, "command.mutedlist.description"),
+		},
+		{
+			Command:     "language",
+			Description: i18n.T(localizer, "command.language.description"),
 		},
 	}
 
@@ -141,30 +166,44 @@ func (b *Bot) Start(ctx context.Context) {
 }
 
 // defaultHandler handles unknown commands and messages
-func defaultHandler(ctx context.Context, b *bot.Bot, update *botModels.Update) {
+func (b *Bot) defaultHandler(ctx context.Context, bot *bot.Bot, update *botModels.Update) {
 	if update.Message == nil {
 		return
 	}
 
-	// Send help message in Persian for unknown commands
-	helpMessage := `دستور نامعتبر است.
+	chatID := update.Message.Chat.ID
 
-دستورات موجود:
-/start - عضویت در ربات
-/recent - مشاهده محتوای اخیر
-/search - جستجوی محتوا (مثال: /search interstellar)
-/mutedlist - مشاهده سریال‌های مسدود شده`
+	// Get user's language preference
+	localizer := b.getLocalizerForUser(ctx, chatID, update.Message.From.LanguageCode)
 
-	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Message.Chat.ID,
-		Text:   helpMessage,
-	})
+	// Send help message
+	helpMessage := i18n.T(localizer, "help.invalid_command")
 
+	err := b.SendMessage(ctx, chatID, helpMessage)
 	if err != nil {
 		slog.Error("Failed to send help message",
-			"chat_id", update.Message.Chat.ID,
+			"chat_id", chatID,
 			"error", err)
 	}
+}
+
+// getLocalizerForUser gets the localizer for a user with fallback chain
+// Fallback chain: saved preference → Telegram language → English default
+func (b *Bot) getLocalizerForUser(ctx context.Context, chatID int64, telegramLangCode string) *goi18n.Localizer {
+	// Try to get saved language preference
+	savedLang, err := b.db.GetLanguage(chatID)
+	if err == nil && savedLang != "" {
+		return i18n.GetLocalizer(b.i18nBundle, savedLang)
+	}
+
+	// Fallback to Telegram language code
+	if telegramLangCode != "" {
+		detectedLang := i18n.DetectLanguage(telegramLangCode, i18n.SupportedLanguages)
+		return i18n.GetLocalizer(b.i18nBundle, detectedLang)
+	}
+
+	// Final fallback to English
+	return i18n.GetLocalizer(b.i18nBundle, i18n.DefaultLanguage)
 }
 
 // SendMessage sends a text message to a chat

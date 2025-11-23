@@ -274,9 +274,9 @@ func TestWelcomeMenuButtons_PersianTextRendering(t *testing.T) {
 	// Test Persian text labels for welcome menu buttons
 	buttons := map[string]string{
 		"تازه‌ها":             "nav:recent",    // Recent Content
-		"جستجو":              "nav:search",    // Search
+		"جستجو":               "nav:search",    // Search
 		"سریال‌های مسدود شده": "nav:mutedlist", // Muted List
-		"راهنما":             "nav:help",      // Help
+		"راهنما":              "nav:help",      // Help
 	}
 
 	// Verify all buttons have Persian text (contains characters in Persian Unicode range)
