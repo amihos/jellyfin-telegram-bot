@@ -86,7 +86,7 @@ changelog:
 
 release:
   github:
-    owner: yourusername
+    owner: amihos
     name: jellyfin-telegram-bot
   draft: false
   prerelease: auto
@@ -101,12 +101,12 @@ release:
     Download the binary for your platform below, or use Docker:
     
     ```bash
-    docker pull ghcr.io/yourusername/jellyfin-telegram-bot:{{ .Version }}
+    docker pull ghcr.io/amihos/jellyfin-telegram-bot:{{ .Version }}
     ```
     
-    See the [README](https://github.com/yourusername/jellyfin-telegram-bot#readme) for installation and configuration instructions.
+    See the [README](https://github.com/amihos/jellyfin-telegram-bot#readme) for installation and configuration instructions.
   footer: |
-    **Full Changelog**: https://github.com/yourusername/jellyfin-telegram-bot/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/amihos/jellyfin-telegram-bot/compare/{{ .PreviousTag }}...{{ .Tag }}
     
     ---
     
