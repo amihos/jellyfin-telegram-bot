@@ -2,10 +2,10 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.22%2B-blue)](https://go.dev/)
-[![Test](https://github.com/yourusername/jellyfin-telegram-bot/workflows/Test/badge.svg)](https://github.com/yourusername/jellyfin-telegram-bot/actions/workflows/test.yml)
-[![Build](https://github.com/yourusername/jellyfin-telegram-bot/workflows/Build/badge.svg)](https://github.com/yourusername/jellyfin-telegram-bot/actions/workflows/build.yml)
-[![Docker](https://github.com/yourusername/jellyfin-telegram-bot/workflows/Docker/badge.svg)](https://github.com/yourusername/jellyfin-telegram-bot/actions/workflows/docker.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/yourusername/jellyfin-telegram-bot)](https://goreportcard.com/report/github.com/yourusername/jellyfin-telegram-bot)
+[![Test](https://github.com/amihos/jellyfin-telegram-bot/workflows/Test/badge.svg)](https://github.com/amihos/jellyfin-telegram-bot/actions/workflows/test.yml)
+[![Build](https://github.com/amihos/jellyfin-telegram-bot/workflows/Build/badge.svg)](https://github.com/amihos/jellyfin-telegram-bot/actions/workflows/build.yml)
+[![Docker](https://github.com/amihos/jellyfin-telegram-bot/workflows/Docker/badge.svg)](https://github.com/amihos/jellyfin-telegram-bot/actions/workflows/docker.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/amihos/jellyfin-telegram-bot)](https://goreportcard.com/report/github.com/amihos/jellyfin-telegram-bot)
 
 A Telegram bot that sends instant notifications when new movies, TV shows, or episodes are added to your Jellyfin media server. Get notified in your preferred language (English or Persian) with beautiful media posters and detailed information.
 
