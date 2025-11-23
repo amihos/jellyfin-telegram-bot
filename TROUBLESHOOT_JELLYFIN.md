@@ -2,12 +2,12 @@
 
 ## Current Issue
 
-✅ **Ping works**: Windows host (10.255.255.254) is reachable
+✅ **Ping works**: Windows host (<WINDOWS_IP>) is reachable
 ❌ **Port 8096 blocked**: Jellyfin not accepting connections from WSL
 
 ```
-ping 10.255.255.254        → Success
-curl 10.255.255.254:8096   → Connection refused
+ping <WINDOWS_IP>        → Success
+curl <WINDOWS_IP>:8096   → Connection refused
 ```
 
 ## Why This Happens
@@ -98,7 +98,7 @@ If you see `127.0.0.1:8096` instead of `0.0.0.0:8096`, Jellyfin is only listenin
 1. Open: **Windows Defender Firewall**
 2. Click: **Turn Windows Defender Firewall on or off**
 3. Select: **Turn off** (for Private network only)
-4. Test connection from WSL: `curl http://10.255.255.254:8096`
+4. Test connection from WSL: `curl http://<WINDOWS_IP>:8096`
 5. **Turn firewall back on** after testing
 
 ---
@@ -114,7 +114,7 @@ If you see `127.0.0.1:8096` instead of `0.0.0.0:8096`, Jellyfin is only listenin
 
 ```bash
 # Test connection
-curl -I http://10.255.255.254:8096
+curl -I http://<WINDOWS_IP>:8096
 
 # Should see HTTP/1.1 302 Found or similar
 ```
@@ -160,13 +160,13 @@ Get-NetFirewallRule | Where-Object {$_.DisplayName -like "*Jellyfin*"}
 
 ```bash
 # Test if host is reachable
-ping 10.255.255.254
+ping <WINDOWS_IP>
 
 # Test if port 8096 is open
-curl -v http://10.255.255.254:8096
+curl -v http://<WINDOWS_IP>:8096
 
 # Test alternative: use telnet
-telnet 10.255.255.254 8096
+telnet <WINDOWS_IP> 8096
 ```
 
 ---
@@ -176,7 +176,7 @@ telnet 10.255.255.254 8096
 ### From WSL:
 
 ```bash
-$ curl -I http://10.255.255.254:8096
+$ curl -I http://<WINDOWS_IP>:8096
 HTTP/1.1 302 Found
 Location: /web/index.html
 ...
@@ -204,11 +204,11 @@ Jellyfin is listening on `127.0.0.1:8096` (localhost only) instead of `0.0.0.0:8
 ## Still Not Working?
 
 1. Check Windows event logs for Jellyfin errors
-2. Verify your Windows IP is actually 10.255.255.254:
+2. Verify your Windows IP address:
    ```powershell
    ipconfig
    ```
-3. Try accessing from Windows browser: http://10.255.255.254:8096
+3. Try accessing from Windows browser: http://<WINDOWS_IP>:8096
 4. Check Jellyfin logs: `C:\ProgramData\Jellyfin\Server\log\`
 
 ---

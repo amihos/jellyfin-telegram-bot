@@ -1,0 +1,119 @@
+# GoReleaser configuration for jellyfin-telegram-bot
+# See https://goreleaser.com for documentation
+
+before:
+  hooks:
+    # Ensure dependencies are downloaded
+    - go mod download
+
+builds:
+  - id: jellyfin-telegram-bot
+    binary: jellyfin-telegram-bot
+    main: ./cmd/bot
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    # Ignore windows/arm64 as it's not commonly used
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+    flags:
+      - -trimpath
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - docs/*
+      - locales/*
+      - .env.example
+      - docker-compose.example.yml
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^chore:'
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: 'New Features'
+      regexp: '^.*feat[(\\w)]*:+.*$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*fix[(\\w)]*:+.*$'
+      order: 1
+    - title: 'Improvements'
+      regexp: '^.*perf[(\\w)]*:+.*$'
+      order: 2
+    - title: 'Other Changes'
+      order: 999
+
+release:
+  github:
+    owner: yourusername
+    name: jellyfin-telegram-bot
+  draft: false
+  prerelease: auto
+  name_template: "v{{ .Version }}"
+  header: |
+    ## Jellyfin Telegram Bot {{ .Version }}
+    
+    Release {{ .Tag }} is now available! 
+    
+    ### Installation
+    
+    Download the binary for your platform below, or use Docker:
+    
+    ```bash
+    docker pull ghcr.io/yourusername/jellyfin-telegram-bot:{{ .Version }}
+    ```
+    
+    See the [README](https://github.com/yourusername/jellyfin-telegram-bot#readme) for installation and configuration instructions.
+  footer: |
+    **Full Changelog**: https://github.com/yourusername/jellyfin-telegram-bot/compare/{{ .PreviousTag }}...{{ .Tag }}
+    
+    ---
+    
+    Thanks for using Jellyfin Telegram Bot!
+
+# Announce releases to Discord/Slack (optional - configure if needed)
+# announce:
+#   discord:
+#     enabled: true
+#     message_template: 'New release: {{ .ProjectName }} {{ .Tag }} is out!'

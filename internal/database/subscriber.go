@@ -10,10 +10,11 @@ import (
 // AddSubscriber adds a new subscriber to the database
 func (db *DB) AddSubscriber(chatID int64, username, firstName string) error {
 	subscriber := models.Subscriber{
-		ChatID:    chatID,
-		Username:  username,
-		FirstName: firstName,
-		IsActive:  true,
+		ChatID:       chatID,
+		Username:     username,
+		FirstName:    firstName,
+		IsActive:     true,
+		LanguageCode: "en", // Default to English, will be updated by language detection
 	}
 
 	// Use FirstOrCreate to handle duplicate chat_id gracefully
@@ -79,4 +80,37 @@ func (db *DB) IsSubscribed(chatID int64) (bool, error) {
 	}
 
 	return count > 0, nil
+}
+
+// SetLanguage sets the language preference for a subscriber
+func (db *DB) SetLanguage(chatID int64, languageCode string) error {
+	result := db.Model(&models.Subscriber{}).
+		Where("chat_id = ?", chatID).
+		Update("language_code", languageCode)
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to set language: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
+}
+
+// GetLanguage retrieves the language preference for a subscriber
+func (db *DB) GetLanguage(chatID int64) (string, error) {
+	var subscriber models.Subscriber
+	result := db.Where("chat_id = ?", chatID).First(&subscriber)
+
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			// Return empty string if subscriber not found
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get language: %w", result.Error)
+	}
+
+	return subscriber.LanguageCode, nil
 }

@@ -6,6 +6,9 @@ import (
 	"log/slog"
 	"strings"
 
+	"jellyfin-telegram-bot/internal/i18n"
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
+
 	"github.com/go-telegram/bot"
 	botModels "github.com/go-telegram/bot/models"
 	"gorm.io/gorm"
@@ -32,6 +35,13 @@ func (b *Bot) handleNavigationCallback(ctx context.Context, botInstance *bot.Bot
 		"chat_id", chatID,
 		"callback_data", callbackData)
 
+	// Get localizer for user
+	telegramLangCode := ""
+	if callbackQuery.From.ID != 0 {
+		telegramLangCode = callbackQuery.From.LanguageCode
+	}
+	localizer := b.getLocalizerForUser(ctx, chatID, telegramLangCode)
+
 	// Parse action from callback data (format: "nav:{action}")
 	parts := strings.SplitN(callbackData, ":", 2)
 	if len(parts) != 2 {
@@ -41,7 +51,7 @@ func (b *Bot) handleNavigationCallback(ctx context.Context, botInstance *bot.Bot
 		// Always answer callback query to prevent stuck loading state
 		botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 			CallbackQueryID: callbackQuery.ID,
-			Text:            "خطا در پردازش درخواست",
+			Text:            i18n.T(localizer, "error.request_processing"),
 			ShowAlert:       false,
 		})
 		return
@@ -52,13 +62,13 @@ func (b *Bot) handleNavigationCallback(ctx context.Context, botInstance *bot.Bot
 	// Route to appropriate logic based on action
 	switch action {
 	case "recent":
-		b.handleNavigationRecent(ctx, botInstance, chatID, callbackQuery)
+		b.handleNavigationRecent(ctx, botInstance, chatID, callbackQuery, localizer)
 	case "search":
-		b.handleNavigationSearch(ctx, botInstance, chatID, callbackQuery)
+		b.handleNavigationSearch(ctx, botInstance, chatID, callbackQuery, localizer)
 	case "mutedlist":
-		b.handleNavigationMutedList(ctx, botInstance, chatID, callbackQuery)
+		b.handleNavigationMutedList(ctx, botInstance, chatID, callbackQuery, localizer)
 	case "help":
-		b.handleNavigationHelp(ctx, botInstance, chatID, callbackQuery)
+		b.handleNavigationHelp(ctx, botInstance, chatID, callbackQuery, localizer)
 	default:
 		slog.Warn("Unknown navigation action",
 			"action", action,
@@ -67,14 +77,14 @@ func (b *Bot) handleNavigationCallback(ctx context.Context, botInstance *bot.Bot
 		// Answer callback query with error
 		botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 			CallbackQueryID: callbackQuery.ID,
-			Text:            "دستور نامعتبر است",
+			Text:            i18n.T(localizer, "error.invalid_callback"),
 			ShowAlert:       false,
 		})
 	}
 }
 
 // handleNavigationRecent handles nav:recent callback
-func (b *Bot) handleNavigationRecent(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery) {
+func (b *Bot) handleNavigationRecent(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery, localizer *goi18n.Localizer) {
 	slog.Info("Processing nav:recent", "chat_id", chatID)
 
 	// Answer callback query immediately to remove loading state
@@ -90,20 +100,20 @@ func (b *Bot) handleNavigationRecent(ctx context.Context, botInstance *bot.Bot, 
 			"chat_id", chatID,
 			"error", err)
 
-		errorMsg := "خطا در دریافت محتوای اخیر. لطفاً بعداً تلاش کنید."
+		errorMsg := i18n.T(localizer, "recent.error")
 		b.SendMessage(ctx, chatID, errorMsg)
 		return
 	}
 
 	// Handle empty results
 	if len(items) == 0 {
-		b.SendMessage(ctx, chatID, "محتوای اخیری یافت نشد")
+		b.SendMessage(ctx, chatID, i18n.T(localizer, "recent.no_results"))
 		return
 	}
 
 	// Send each item with poster and formatted message
 	for _, item := range items {
-		b.sendContentItem(ctx, chatID, &item)
+		b.sendContentItem(ctx, chatID, &item, localizer)
 	}
 
 	slog.Info("Sent recent items via navigation",
@@ -112,7 +122,7 @@ func (b *Bot) handleNavigationRecent(ctx context.Context, botInstance *bot.Bot, 
 }
 
 // handleNavigationSearch handles nav:search callback
-func (b *Bot) handleNavigationSearch(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery) {
+func (b *Bot) handleNavigationSearch(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery, localizer *goi18n.Localizer) {
 	slog.Info("Processing nav:search", "chat_id", chatID)
 
 	// Answer callback query immediately to remove loading state
@@ -121,8 +131,8 @@ func (b *Bot) handleNavigationSearch(ctx context.Context, botInstance *bot.Bot, 
 		ShowAlert:       false,
 	})
 
-	// Send search instructions in Persian
-	searchInstructions := "لطفاً عبارت جستجو را وارد کنید. مثال: /search interstellar"
+	// Send search instructions
+	searchInstructions := i18n.T(localizer, "search.prompt")
 	if err := b.SendMessage(ctx, chatID, searchInstructions); err != nil {
 		slog.Error("Failed to send search instructions",
 			"chat_id", chatID,
@@ -133,7 +143,7 @@ func (b *Bot) handleNavigationSearch(ctx context.Context, botInstance *bot.Bot, 
 }
 
 // handleNavigationMutedList handles nav:mutedlist callback
-func (b *Bot) handleNavigationMutedList(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery) {
+func (b *Bot) handleNavigationMutedList(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery, localizer *goi18n.Localizer) {
 	slog.Info("Processing nav:mutedlist", "chat_id", chatID)
 
 	// Answer callback query immediately to remove loading state
@@ -149,21 +159,22 @@ func (b *Bot) handleNavigationMutedList(ctx context.Context, botInstance *bot.Bo
 			"chat_id", chatID,
 			"error", err)
 
-		errorMsg := "خطا در دریافت لیست سریال‌های مسدود شده. لطفاً بعداً تلاش کنید."
+		errorMsg := i18n.T(localizer, "mutedlist.error")
 		b.SendMessage(ctx, chatID, errorMsg)
 		return
 	}
 
 	// Handle empty list case
 	if len(mutedSeries) == 0 {
-		emptyMsg := "شما هیچ سریالی را مسدود نکرده‌اید"
+		emptyMsg := i18n.T(localizer, "mutedlist.empty")
 		b.SendMessage(ctx, chatID, emptyMsg)
 		return
 	}
 
 	// Format response message
 	var messageText strings.Builder
-	messageText.WriteString("سریال‌های مسدود شده:\n\n")
+	messageText.WriteString(i18n.T(localizer, "mutedlist.title"))
+	messageText.WriteString("\n\n")
 
 	// Create inline keyboard with unmute button for each series
 	var buttons [][]botModels.InlineKeyboardButton
@@ -173,9 +184,12 @@ func (b *Bot) handleNavigationMutedList(ctx context.Context, botInstance *bot.Bo
 		messageText.WriteString(fmt.Sprintf("%d. %s\n", i+1, series.SeriesName))
 
 		// Create unmute button for this series
+		buttonText := i18n.TWithData(localizer, "button.unmute", map[string]interface{}{
+			"SeriesName": series.SeriesName,
+		})
 		buttons = append(buttons, []botModels.InlineKeyboardButton{
 			{
-				Text:         fmt.Sprintf("رفع مسدودیت: %s", series.SeriesName),
+				Text:         buttonText,
 				CallbackData: fmt.Sprintf("unmute:%s", series.SeriesID),
 			},
 		})
@@ -199,7 +213,7 @@ func (b *Bot) handleNavigationMutedList(ctx context.Context, botInstance *bot.Bo
 }
 
 // handleNavigationHelp handles nav:help callback
-func (b *Bot) handleNavigationHelp(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery) {
+func (b *Bot) handleNavigationHelp(ctx context.Context, botInstance *bot.Bot, chatID int64, callbackQuery *botModels.CallbackQuery, localizer *goi18n.Localizer) {
 	slog.Info("Processing nav:help", "chat_id", chatID)
 
 	// Answer callback query immediately to remove loading state
@@ -208,12 +222,8 @@ func (b *Bot) handleNavigationHelp(ctx context.Context, botInstance *bot.Bot, ch
 		ShowAlert:       false,
 	})
 
-	// Send help message in Persian (reuse help message from defaultHandler)
-	helpMessage := `دستورات موجود:
-/start - عضویت در ربات
-/recent - مشاهده محتوای اخیر
-/search - جستجوی محتوا (مثال: /search interstellar)
-/mutedlist - مشاهده سریال‌های مسدود شده`
+	// Send help message
+	helpMessage := i18n.T(localizer, "help.message")
 
 	if err := b.SendMessage(ctx, chatID, helpMessage); err != nil {
 		slog.Error("Failed to send help message via navigation",
@@ -245,6 +255,13 @@ func (b *Bot) handleMuteCallback(ctx context.Context, botInstance *bot.Bot, upda
 		"chat_id", chatID,
 		"callback_data", callbackData)
 
+	// Get localizer for user
+	telegramLangCode := ""
+	if callbackQuery.From.ID != 0 {
+		telegramLangCode = callbackQuery.From.LanguageCode
+	}
+	localizer := b.getLocalizerForUser(ctx, chatID, telegramLangCode)
+
 	// Parse series name from callback data (format: "mute:{SeriesName}")
 	parts := strings.SplitN(callbackData, ":", 2)
 	if len(parts) != 2 {
@@ -266,7 +283,7 @@ func (b *Bot) handleMuteCallback(ctx context.Context, botInstance *bot.Bot, upda
 		// Answer callback query with error
 		botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 			CallbackQueryID: callbackQuery.ID,
-			Text:            "خطا در مسدود کردن سریال",
+			Text:            i18n.T(localizer, "mute.error"),
 			ShowAlert:       false,
 		})
 		return
@@ -275,19 +292,21 @@ func (b *Bot) handleMuteCallback(ctx context.Context, botInstance *bot.Bot, upda
 	// Answer callback query
 	botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 		CallbackQueryID: callbackQuery.ID,
-		Text:            "✓ مسدود شد",
+		Text:            i18n.T(localizer, "mute.callback_success"),
 		ShowAlert:       false,
 	})
 
 	// Send confirmation message with undo button
-	confirmationMsg := fmt.Sprintf("✓ شما دیگر اعلان‌های %s را دریافت نخواهید کرد", seriesName)
+	confirmationMsg := i18n.TWithData(localizer, "mute.success", map[string]interface{}{
+		"SeriesName": seriesName,
+	})
 
 	// Create inline keyboard with undo button
 	undoKeyboard := &botModels.InlineKeyboardMarkup{
 		InlineKeyboard: [][]botModels.InlineKeyboardButton{
 			{
 				{
-					Text:         "رفع مسدودیت",
+					Text:         i18n.T(localizer, "button.undo_mute"),
 					CallbackData: fmt.Sprintf("undo_mute:%s", seriesName),
 				},
 			},
@@ -300,7 +319,7 @@ func (b *Bot) handleMuteCallback(ctx context.Context, botInstance *bot.Bot, upda
 			"error", err)
 	}
 
-	// Edit original message to disable button (change button text to "✓ مسدود شده")
+	// Edit original message to disable button (change button text to muted state)
 	originalMessage := callbackQuery.Message.Message
 
 	// Create new keyboard with disabled button
@@ -308,7 +327,7 @@ func (b *Bot) handleMuteCallback(ctx context.Context, botInstance *bot.Bot, upda
 		InlineKeyboard: [][]botModels.InlineKeyboardButton{
 			{
 				{
-					Text:         "✓ مسدود شده",
+					Text:         i18n.T(localizer, "button.muted"),
 					CallbackData: "muted", // Inactive callback data
 				},
 			},
@@ -354,6 +373,13 @@ func (b *Bot) handleUndoMuteCallback(ctx context.Context, botInstance *bot.Bot, 
 		"chat_id", chatID,
 		"callback_data", callbackData)
 
+	// Get localizer for user
+	telegramLangCode := ""
+	if callbackQuery.From.ID != 0 {
+		telegramLangCode = callbackQuery.From.LanguageCode
+	}
+	localizer := b.getLocalizerForUser(ctx, chatID, telegramLangCode)
+
 	// Parse series name from callback data (format: "undo_mute:{SeriesName}")
 	parts := strings.SplitN(callbackData, ":", 2)
 	if len(parts) != 2 {
@@ -363,7 +389,7 @@ func (b *Bot) handleUndoMuteCallback(ctx context.Context, botInstance *bot.Bot, 
 		// Always answer callback query
 		botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 			CallbackQueryID: callbackQuery.ID,
-			Text:            "خطا در پردازش درخواست",
+			Text:            i18n.T(localizer, "error.request_processing"),
 			ShowAlert:       false,
 		})
 		return
@@ -382,7 +408,7 @@ func (b *Bot) handleUndoMuteCallback(ctx context.Context, botInstance *bot.Bot, 
 			// Answer callback query
 			botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 				CallbackQueryID: callbackQuery.ID,
-				Text:            "سریال در لیست مسدودی‌ها یافت نشد",
+				Text:            i18n.T(localizer, "unmute.not_found"),
 				ShowAlert:       false,
 			})
 			return
@@ -396,7 +422,7 @@ func (b *Bot) handleUndoMuteCallback(ctx context.Context, botInstance *bot.Bot, 
 		// Answer callback query with error
 		botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 			CallbackQueryID: callbackQuery.ID,
-			Text:            "خطا در رفع مسدودیت سریال",
+			Text:            i18n.T(localizer, "unmute.error"),
 			ShowAlert:       false,
 		})
 		return
@@ -405,12 +431,14 @@ func (b *Bot) handleUndoMuteCallback(ctx context.Context, botInstance *bot.Bot, 
 	// Answer callback query
 	botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 		CallbackQueryID: callbackQuery.ID,
-		Text:            "✓ رفع مسدودیت شد",
+		Text:            i18n.T(localizer, "unmute.callback_success"),
 		ShowAlert:       false,
 	})
 
 	// Send confirmation message
-	confirmationMsg := fmt.Sprintf("✓ %s از لیست مسدودی‌ها حذف شد", seriesName)
+	confirmationMsg := i18n.TWithData(localizer, "unmute.success", map[string]interface{}{
+		"SeriesName": seriesName,
+	})
 	if err := b.SendMessage(ctx, chatID, confirmationMsg); err != nil {
 		slog.Error("Failed to send confirmation message",
 			"chat_id", chatID,
@@ -425,7 +453,7 @@ func (b *Bot) handleUndoMuteCallback(ctx context.Context, botInstance *bot.Bot, 
 		InlineKeyboard: [][]botModels.InlineKeyboardButton{
 			{
 				{
-					Text:         "✓ رفع مسدودیت شد",
+					Text:         i18n.T(localizer, "unmute.callback_success"),
 					CallbackData: "unmuted", // Inactive callback data
 				},
 			},
@@ -471,6 +499,13 @@ func (b *Bot) handleUnmuteCallback(ctx context.Context, botInstance *bot.Bot, up
 		"chat_id", chatID,
 		"callback_data", callbackData)
 
+	// Get localizer for user
+	telegramLangCode := ""
+	if callbackQuery.From.ID != 0 {
+		telegramLangCode = callbackQuery.From.LanguageCode
+	}
+	localizer := b.getLocalizerForUser(ctx, chatID, telegramLangCode)
+
 	// Parse series ID from callback data (format: "unmute:{SeriesID}")
 	parts := strings.SplitN(callbackData, ":", 2)
 	if len(parts) != 2 {
@@ -504,7 +539,7 @@ func (b *Bot) handleUnmuteCallback(ctx context.Context, botInstance *bot.Bot, up
 			// Answer callback query
 			botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 				CallbackQueryID: callbackQuery.ID,
-				Text:            "سریال در لیست مسدودی‌ها یافت نشد",
+				Text:            i18n.T(localizer, "unmute.not_found"),
 				ShowAlert:       false,
 			})
 			return
@@ -518,7 +553,7 @@ func (b *Bot) handleUnmuteCallback(ctx context.Context, botInstance *bot.Bot, up
 		// Answer callback query with error
 		botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 			CallbackQueryID: callbackQuery.ID,
-			Text:            "خطا در رفع مسدودیت سریال",
+			Text:            i18n.T(localizer, "unmute.error"),
 			ShowAlert:       false,
 		})
 		return
@@ -527,12 +562,14 @@ func (b *Bot) handleUnmuteCallback(ctx context.Context, botInstance *bot.Bot, up
 	// Answer callback query
 	botInstance.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 		CallbackQueryID: callbackQuery.ID,
-		Text:            "✓ رفع مسدودیت شد",
+		Text:            i18n.T(localizer, "unmute.callback_success"),
 		ShowAlert:       false,
 	})
 
 	// Send confirmation message
-	confirmationMsg := fmt.Sprintf("✓ %s از لیست مسدودی‌ها حذف شد", seriesName)
+	confirmationMsg := i18n.TWithData(localizer, "unmute.success", map[string]interface{}{
+		"SeriesName": seriesName,
+	})
 	if err := b.SendMessage(ctx, chatID, confirmationMsg); err != nil {
 		slog.Error("Failed to send confirmation message",
 			"chat_id", chatID,
@@ -554,17 +591,20 @@ func (b *Bot) handleUnmuteCallback(ctx context.Context, botInstance *bot.Bot, up
 	var keyboard *botModels.InlineKeyboardMarkup
 
 	if len(updatedMutedSeries) == 0 {
-		messageText = "شما هیچ سریالی را مسدود نکرده‌اید"
+		messageText = i18n.T(localizer, "mutedlist.empty")
 	} else {
-		messageText = "سریال‌های مسدود شده:\n\n"
+		messageText = i18n.T(localizer, "mutedlist.title") + "\n\n"
 		var buttons [][]botModels.InlineKeyboardButton
 
 		for i, series := range updatedMutedSeries {
 			messageText += fmt.Sprintf("%d. %s\n", i+1, series.SeriesName)
 			// Create unmute button for each series
+			buttonText := i18n.TWithData(localizer, "button.unmute", map[string]interface{}{
+				"SeriesName": series.SeriesName,
+			})
 			buttons = append(buttons, []botModels.InlineKeyboardButton{
 				{
-					Text:         fmt.Sprintf("رفع مسدودیت: %s", series.SeriesName),
+					Text:         buttonText,
 					CallbackData: fmt.Sprintf("unmute:%s", series.SeriesID),
 				},
 			})

@@ -5,13 +5,17 @@ import (
 	"errors"
 	"testing"
 
+	"jellyfin-telegram-bot/internal/i18n"
 	"jellyfin-telegram-bot/pkg/models"
+
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // Mock implementations for testing
 
 type MockSubscriberDB struct {
 	subscribers    map[int64]bool
+	languages      map[int64]string // chatID -> languageCode
 	mutedSeries    map[int64]map[string]bool // chatID -> seriesID -> isMuted
 	shouldFailAdd  bool
 	shouldFailGet  bool
@@ -20,6 +24,7 @@ type MockSubscriberDB struct {
 func NewMockSubscriberDB() *MockSubscriberDB {
 	return &MockSubscriberDB{
 		subscribers: make(map[int64]bool),
+		languages:   make(map[int64]string),
 		mutedSeries: make(map[int64]map[string]bool),
 	}
 }
@@ -52,6 +57,18 @@ func (m *MockSubscriberDB) GetAllActiveSubscribers() ([]int64, error) {
 
 func (m *MockSubscriberDB) IsSubscribed(chatID int64) (bool, error) {
 	return m.subscribers[chatID], nil
+}
+
+func (m *MockSubscriberDB) SetLanguage(chatID int64, languageCode string) error {
+	m.languages[chatID] = languageCode
+	return nil
+}
+
+func (m *MockSubscriberDB) GetLanguage(chatID int64) (string, error) {
+	if lang, ok := m.languages[chatID]; ok {
+		return lang, nil
+	}
+	return "en", nil // Default to English
 }
 
 func (m *MockSubscriberDB) AddMutedSeries(chatID int64, seriesID string, seriesName string) error {
@@ -156,6 +173,15 @@ func (m *MockJellyfinClient) GetPosterImage(ctx context.Context, itemID string) 
 	return m.imageData, nil
 }
 
+// Helper function to get English localizer for testing
+func getTestLocalizer() *goi18n.Localizer {
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		return nil
+	}
+	return goi18n.NewLocalizer(bundle, "en")
+}
+
 // Tests
 
 // Test 1: Bot initialization with valid token
@@ -203,6 +229,11 @@ func TestNewBot_EmptyToken(t *testing.T) {
 
 // Test 3: FormatContentMessage for Movie
 func TestFormatContentMessage_Movie(t *testing.T) {
+	localizer := getTestLocalizer()
+	if localizer == nil {
+		t.Fatal("Failed to initialize test localizer")
+	}
+
 	item := &ContentItem{
 		ItemID:          "movie1",
 		Name:            "The Matrix",
@@ -212,15 +243,15 @@ func TestFormatContentMessage_Movie(t *testing.T) {
 		ProductionYear:  1999,
 	}
 
-	message := FormatContentMessage(item)
+	message := FormatContentMessage(item, localizer)
 
 	if message == "" {
 		t.Fatal("Expected non-empty message")
 	}
 
-	// Check for Persian movie indicator
-	if !contains(message, "🎬 فیلم") {
-		t.Error("Message should contain movie indicator in Persian")
+	// Check for movie indicator (in English for test)
+	if !contains(message, "Movie") {
+		t.Error("Message should contain movie indicator")
 	}
 
 	// Check for title
@@ -236,6 +267,11 @@ func TestFormatContentMessage_Movie(t *testing.T) {
 
 // Test 4: FormatContentMessage for Episode
 func TestFormatContentMessage_Episode(t *testing.T) {
+	localizer := getTestLocalizer()
+	if localizer == nil {
+		t.Fatal("Failed to initialize test localizer")
+	}
+
 	item := &ContentItem{
 		ItemID:        "episode1",
 		Name:          "Pilot",
@@ -246,15 +282,15 @@ func TestFormatContentMessage_Episode(t *testing.T) {
 		EpisodeNumber: 1,
 	}
 
-	message := FormatContentMessage(item)
+	message := FormatContentMessage(item, localizer)
 
 	if message == "" {
 		t.Fatal("Expected non-empty message")
 	}
 
-	// Check for Persian episode indicator
-	if !contains(message, "📺 قسمت") {
-		t.Error("Message should contain episode indicator in Persian")
+	// Check for episode indicator (in English for test)
+	if !contains(message, "Episode") {
+		t.Error("Message should contain episode indicator")
 	}
 
 	// Check for series name
@@ -263,13 +299,18 @@ func TestFormatContentMessage_Episode(t *testing.T) {
 	}
 
 	// Check for season and episode
-	if !contains(message, "فصل 1") || !contains(message, "قسمت 1") {
-		t.Error("Message should contain season and episode numbers in Persian")
+	if !contains(message, "Season 1") || !contains(message, "Episode 1") {
+		t.Error("Message should contain season and episode numbers")
 	}
 }
 
 // Test 5: FormatNotification for Movie
 func TestFormatNotification_Movie(t *testing.T) {
+	localizer := getTestLocalizer()
+	if localizer == nil {
+		t.Fatal("Failed to initialize test localizer")
+	}
+
 	content := &NotificationContent{
 		ItemID:   "movie1",
 		Type:     "Movie",
@@ -279,15 +320,15 @@ func TestFormatNotification_Movie(t *testing.T) {
 		Rating:   8.8,
 	}
 
-	message := FormatNotification(content)
+	message := FormatNotification(content, localizer)
 
 	if message == "" {
 		t.Fatal("Expected non-empty message")
 	}
 
-	// Check for Persian new movie indicator
-	if !contains(message, "🎬 فیلم جدید") {
-		t.Error("Notification should contain 'new movie' indicator in Persian")
+	// Check for new movie indicator
+	if !contains(message, "New") || !contains(message, "Movie") {
+		t.Error("Notification should contain 'new movie' indicator")
 	}
 
 	// Check for title
@@ -303,6 +344,11 @@ func TestFormatNotification_Movie(t *testing.T) {
 
 // Test 6: FormatNotification for Episode
 func TestFormatNotification_Episode(t *testing.T) {
+	localizer := getTestLocalizer()
+	if localizer == nil {
+		t.Fatal("Failed to initialize test localizer")
+	}
+
 	content := &NotificationContent{
 		ItemID:        "episode1",
 		Type:          "Episode",
@@ -314,15 +360,15 @@ func TestFormatNotification_Episode(t *testing.T) {
 		Rating:        9.0,
 	}
 
-	message := FormatNotification(content)
+	message := FormatNotification(content, localizer)
 
 	if message == "" {
 		t.Fatal("Expected non-empty message")
 	}
 
-	// Check for Persian new episode indicator
-	if !contains(message, "📺 قسمت جدید") {
-		t.Error("Notification should contain 'new episode' indicator in Persian")
+	// Check for new episode indicator
+	if !contains(message, "New") || !contains(message, "Episode") {
+		t.Error("Notification should contain 'new episode' indicator")
 	}
 
 	// Check for series name
@@ -331,7 +377,7 @@ func TestFormatNotification_Episode(t *testing.T) {
 	}
 
 	// Check for season and episode
-	if !contains(message, "فصل 1") || !contains(message, "قسمت 1") {
+	if !contains(message, "Season 1") || !contains(message, "Episode 1") {
 		t.Error("Notification should contain season and episode numbers")
 	}
 }
@@ -367,7 +413,12 @@ func TestBroadcastNotification_Success(t *testing.T) {
 	}
 
 	// Verify notification formatting
-	message := FormatNotification(content)
+	localizer := getTestLocalizer()
+	if localizer == nil {
+		t.Fatal("Failed to initialize test localizer")
+	}
+
+	message := FormatNotification(content, localizer)
 	if message == "" {
 		t.Error("Expected formatted notification message")
 	}
@@ -398,7 +449,12 @@ func TestBroadcastNotification_NoSubscribers(t *testing.T) {
 	}
 
 	// Format notification should still work
-	message := FormatNotification(content)
+	localizer := getTestLocalizer()
+	if localizer == nil {
+		t.Fatal("Failed to initialize test localizer")
+	}
+
+	message := FormatNotification(content, localizer)
 	if message == "" {
 		t.Error("Expected formatted notification message even with no subscribers")
 	}

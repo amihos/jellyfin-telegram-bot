@@ -1,0 +1,166 @@
+# ============================================
+# Docker Ignore File
+# ============================================
+# This file excludes unnecessary files from the Docker build context
+# Benefits:
+# - Faster builds (smaller context to send to Docker daemon)
+# - Smaller images (excluded files won't be copied)
+# - Better security (prevents accidentally copying sensitive files)
+
+# ============================================
+# Version Control
+# ============================================
+.git
+.gitignore
+.gitattributes
+.github
+
+# ============================================
+# Agent OS / Development Tools
+# ============================================
+agent-os/
+.claude/
+
+# ============================================
+# Environment and Secrets
+# ============================================
+# Never include actual credentials in Docker image
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+
+# ============================================
+# Database Files
+# ============================================
+# Database files shouldn't be baked into the image
+# They should be mounted as volumes for persistence
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# ============================================
+# Log Files
+# ============================================
+# Logs shouldn't be baked into the image
+# They should be written to mounted volumes
+logs/
+*.log
+
+# ============================================
+# Compiled Binaries
+# ============================================
+# Don't include pre-compiled binaries
+# The Dockerfile will build a fresh one
+jellyfin-bot
+jellyfin-telegram-bot
+*.exe
+*.dll
+*.so
+*.dylib
+
+# ============================================
+# Test Files
+# ============================================
+# Tests run during development, not needed in production image
+test/
+*_test.go
+*.test
+coverage.out
+coverage.html
+
+# ============================================
+# Documentation (Markdown)
+# ============================================
+# Most docs aren't needed in the runtime image
+# Exception: We keep .env.example as reference
+*.md
+!README.md
+# Actually, don't include README in image either
+README.md
+
+# ============================================
+# Scripts and Utilities
+# ============================================
+# Development and testing scripts not needed in production
+scripts/
+deployments/
+examples/
+*.sh
+*.ps1
+*.bat
+
+# ============================================
+# Downloaded Tools
+# ============================================
+# Security scanning tools used during development
+gitleaks
+gitleaks_*
+trufflehog
+trufflehog_*
+*.tar.gz
+*.zip
+
+# ============================================
+# IDE and Editor Files
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.DS_Store
+
+# ============================================
+# Temporary Files
+# ============================================
+tmp/
+temp/
+*.tmp
+*.cache
+
+# ============================================
+# Docker Files (except .dockerignore and Dockerfile)
+# ============================================
+docker-compose*.yml
+.dockerignore
+# Don't ignore Dockerfile itself - it's needed for context
+
+# ============================================
+# CI/CD
+# ============================================
+.github/
+
+# ============================================
+# Go Build Artifacts
+# ============================================
+vendor/
+bin/
+dist/
+
+# ============================================
+# OS Files
+# ============================================
+Thumbs.db
+Desktop.ini
+
+# ============================================
+# Data Directories
+# ============================================
+# These should be mounted as volumes, not baked into image
+data/
+
+# ============================================
+# Keep These Files
+# ============================================
+# The following are NOT ignored and will be included in the build:
+# - go.mod, go.sum (needed for dependency management)
+# - *.go files (source code)
+# - locales/ (i18n translation files)
+# - .env.example (as reference documentation)
+# - Dockerfile (needed for build)

@@ -68,3 +68,12 @@ config.yaml
 # Compiled binary
 jellyfin-bot
 /cmd/bot/bot
+
+# Agent OS (local development only, do not commit)
+agent-os/
+
+# Security scanning tools (downloaded locally)
+gitleaks
+trufflehog
+*.tar.gz
+gitleaks-report.json

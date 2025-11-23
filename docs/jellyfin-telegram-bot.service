@@ -1,0 +1,38 @@
+[Unit]
+Description=Jellyfin Telegram Bot
+Documentation=https://github.com/yourusername/jellyfin-telegram-bot
+After=network.target
+
+[Service]
+Type=simple
+User=jellyfin-bot
+Group=jellyfin-bot
+
+# Working directory (adjust path as needed)
+WorkingDirectory=/opt/jellyfin-telegram-bot
+
+# Path to the bot binary (adjust as needed)
+ExecStart=/opt/jellyfin-telegram-bot/jellyfin-telegram-bot
+
+# Load environment variables from .env file
+EnvironmentFile=/opt/jellyfin-telegram-bot/.env
+
+# Security settings
+# Run as non-root user for security
+NoNewPrivileges=true
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+
+# Resource limits (optional, adjust as needed)
+# MemoryMax=128M
+# CPUQuota=50%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=jellyfin-telegram-bot
+
+[Install]
+WantedBy=multi-user.target

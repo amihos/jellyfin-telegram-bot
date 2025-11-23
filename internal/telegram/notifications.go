@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package telegram
 
 import (
@@ -7,7 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"jellyfin-telegram-bot/internal/i18n"
+
 	botModels "github.com/go-telegram/bot/models"
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // NotificationContent represents content to be broadcasted
@@ -23,48 +28,79 @@ type NotificationContent struct {
 	EpisodeNumber int
 }
 
-// FormatNotification formats content for notification message
-func FormatNotification(content *NotificationContent) string {
+// FormatNotification formats content for notification message using i18n
+func FormatNotification(content *NotificationContent, localizer *goi18n.Localizer) string {
 	var message strings.Builder
 
 	if content.Type == "Movie" {
 		// Movie notification format
-		message.WriteString("🎬 فیلم جدید\n\n")
-		message.WriteString(fmt.Sprintf("نام: %s", content.Title))
+		message.WriteString(i18n.T(localizer, "notification.movie.header"))
+		message.WriteString("\n\n")
+		message.WriteString(i18n.TWithData(localizer, "content.field.name", map[string]interface{}{
+			"Name": content.Title,
+		}))
 
 		if content.Year > 0 {
-			message.WriteString(fmt.Sprintf("\nسال: %d", content.Year))
+			message.WriteString("\n")
+			message.WriteString(i18n.TWithData(localizer, "content.field.year", map[string]interface{}{
+				"Year": content.Year,
+			}))
 		}
 
 		if content.Overview != "" {
-			message.WriteString(fmt.Sprintf("\n\nتوضیحات: %s", content.Overview))
+			message.WriteString("\n\n")
+			message.WriteString(i18n.TWithData(localizer, "content.field.description", map[string]interface{}{
+				"Description": content.Overview,
+			}))
 		}
 
 		if content.Rating > 0 {
-			message.WriteString(fmt.Sprintf("\n\nامتیاز: %.1f/10", content.Rating))
+			message.WriteString("\n\n")
+			message.WriteString(i18n.TWithData(localizer, "content.field.rating", map[string]interface{}{
+				"Rating": fmt.Sprintf("%.1f", content.Rating),
+			}))
 		}
 	} else if content.Type == "Episode" {
 		// Episode notification format
-		message.WriteString("📺 قسمت جدید\n\n")
+		message.WriteString(i18n.T(localizer, "notification.episode.header"))
+		message.WriteString("\n\n")
 
 		if content.SeriesName != "" {
-			message.WriteString(fmt.Sprintf("سریال: %s\n", content.SeriesName))
-		} else {
-			message.WriteString(fmt.Sprintf("سریال: %s\n", content.Title))
+			message.WriteString(i18n.TWithData(localizer, "content.field.series", map[string]interface{}{
+				"SeriesName": content.SeriesName,
+			}))
+			message.WriteString("\n")
+		} else if content.Title != "" {
+			message.WriteString(i18n.TWithData(localizer, "content.field.series", map[string]interface{}{
+				"SeriesName": content.Title,
+			}))
+			message.WriteString("\n")
 		}
 
-		message.WriteString(fmt.Sprintf("فصل %d - قسمت %d", content.SeasonNumber, content.EpisodeNumber))
+		message.WriteString(i18n.TWithData(localizer, "content.field.episode_number", map[string]interface{}{
+			"SeasonNumber":  content.SeasonNumber,
+			"EpisodeNumber": content.EpisodeNumber,
+		}))
 
 		if content.Title != "" && content.SeriesName != "" {
-			message.WriteString(fmt.Sprintf("\nنام قسمت: %s", content.Title))
+			message.WriteString("\n")
+			message.WriteString(i18n.TWithData(localizer, "content.field.episode_name", map[string]interface{}{
+				"Name": content.Title,
+			}))
 		}
 
 		if content.Overview != "" {
-			message.WriteString(fmt.Sprintf("\n\nتوضیحات: %s", content.Overview))
+			message.WriteString("\n\n")
+			message.WriteString(i18n.TWithData(localizer, "content.field.description", map[string]interface{}{
+				"Description": content.Overview,
+			}))
 		}
 
 		if content.Rating > 0 {
-			message.WriteString(fmt.Sprintf("\n\nامتیاز: %.1f/10", content.Rating))
+			message.WriteString("\n\n")
+			message.WriteString(i18n.TWithData(localizer, "content.field.rating", map[string]interface{}{
+				"Rating": fmt.Sprintf("%.1f", content.Rating),
+			}))
 		}
 	}
 
@@ -86,13 +122,13 @@ func shouldShowMuteButton(content *NotificationContent) bool {
 	return true
 }
 
-// createMuteButton creates inline keyboard with mute button
-func createMuteButton(seriesName string) *botModels.InlineKeyboardMarkup {
+// createMuteButton creates inline keyboard with mute button using i18n
+func (b *Bot) createMuteButton(seriesName string, localizer *goi18n.Localizer) *botModels.InlineKeyboardMarkup {
 	return &botModels.InlineKeyboardMarkup{
 		InlineKeyboard: [][]botModels.InlineKeyboardButton{
 			{
 				{
-					Text:         "دنبال نکردن",
+					Text:         i18n.T(localizer, "button.mute"),
 					CallbackData: fmt.Sprintf("mute:%s", seriesName),
 				},
 			},
@@ -191,19 +227,6 @@ func (b *Bot) BroadcastNotification(ctx context.Context, content *NotificationCo
 		"subscriber_count", len(filteredSubscribers),
 		"filtered_count", mutedCount)
 
-	// Format notification message
-	message := FormatNotification(content)
-
-	// Create inline keyboard for episodes with valid series name
-	var keyboard *botModels.InlineKeyboardMarkup
-	if shouldShowMuteButton(content) {
-		keyboard = createMuteButton(content.SeriesName)
-	} else if !shouldShowMuteButton(content) && content.Type == "Episode" {
-		slog.Debug("Skipping mute button",
-			"reason", "invalid series name",
-			"series_name", content.SeriesName)
-	}
-
 	// Fetch poster image
 	var imageData []byte
 	if content.ItemID != "" {
@@ -221,11 +244,27 @@ func (b *Bot) BroadcastNotification(ctx context.Context, content *NotificationCo
 	failureCount := 0
 	blockedCount := 0
 
-	// Broadcast to all filtered subscribers
+	// Broadcast to all filtered subscribers with their language preference
 	for _, chatID := range filteredSubscribers {
 		// Handle Telegram rate limiting (max 30 messages/second)
 		// Add small delay to avoid hitting rate limits
 		time.Sleep(35 * time.Millisecond)
+
+		// Get user's language preference for localized message
+		localizer := b.getLocalizerForUser(ctx, chatID, "")
+
+		// Format notification message with user's language
+		message := FormatNotification(content, localizer)
+
+		// Create inline keyboard for episodes with valid series name
+		var keyboard *botModels.InlineKeyboardMarkup
+		if shouldShowMuteButton(content) {
+			keyboard = b.createMuteButton(content.SeriesName, localizer)
+		} else if !shouldShowMuteButton(content) && content.Type == "Episode" {
+			slog.Debug("Skipping mute button",
+				"reason", "invalid series name",
+				"series_name", content.SeriesName)
+		}
 
 		var sendErr error
 		if imageData != nil && len(imageData) > 0 {

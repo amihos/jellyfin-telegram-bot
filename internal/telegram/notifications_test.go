@@ -3,16 +3,20 @@ package telegram
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
+	"jellyfin-telegram-bot/internal/i18n"
 	"jellyfin-telegram-bot/pkg/models"
 
 	botModels "github.com/go-telegram/bot/models"
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // mockSubscriberDB implements SubscriberDB interface for testing
 type mockSubscriberDB struct {
 	subscribers  []int64
+	languages    map[int64]string // chatID -> languageCode
 	mutedSeries  map[int64]map[string]bool // chatID -> seriesID -> isMuted
 	addSubErr    error
 	removeSubErr error
@@ -21,6 +25,7 @@ type mockSubscriberDB struct {
 func newMockSubscriberDB() *mockSubscriberDB {
 	return &mockSubscriberDB{
 		subscribers: []int64{},
+		languages:   make(map[int64]string),
 		mutedSeries: make(map[int64]map[string]bool),
 	}
 }
@@ -57,6 +62,18 @@ func (m *mockSubscriberDB) IsSubscribed(chatID int64) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func (m *mockSubscriberDB) SetLanguage(chatID int64, languageCode string) error {
+	m.languages[chatID] = languageCode
+	return nil
+}
+
+func (m *mockSubscriberDB) GetLanguage(chatID int64) (string, error) {
+	if lang, ok := m.languages[chatID]; ok {
+		return lang, nil
+	}
+	return "en", nil // Default to English
 }
 
 func (m *mockSubscriberDB) AddMutedSeries(chatID int64, seriesID string, seriesName string) error {
@@ -113,18 +130,44 @@ func (m *mockJellyfinClient) GetPosterImage(ctx context.Context, itemID string) 
 	return m.posterData, m.posterErr
 }
 
+// Helper function to get Persian localizer for testing (notifications test version)
+func getPersianTestLocalizer() *goi18n.Localizer {
+	bundle, err := i18n.InitBundle()
+	if err != nil {
+		return nil
+	}
+	return goi18n.NewLocalizer(bundle, "fa")
+}
+
+// createTestMuteButton creates inline keyboard with mute button for testing
+func createTestMuteButton(seriesName string, localizer *goi18n.Localizer) *botModels.InlineKeyboardMarkup {
+	return &botModels.InlineKeyboardMarkup{
+		InlineKeyboard: [][]botModels.InlineKeyboardButton{
+			{
+				{
+					Text:         i18n.T(localizer, "button.mute"),
+					CallbackData: fmt.Sprintf("mute:%s", seriesName),
+				},
+			},
+		},
+	}
+}
+
 // testBotWrapper wraps Bot to track sent messages without needing real Telegram bot
 type testBotWrapper struct {
 	db             SubscriberDB
 	jellyfinClient JellyfinClient
+	localizer      *goi18n.Localizer
 	sentMessages   map[int64][]string
 	sentKeyboards  map[int64][]*botModels.InlineKeyboardMarkup
 }
 
 func newTestBotWrapper(db SubscriberDB, jf JellyfinClient) *testBotWrapper {
+	localizer := getPersianTestLocalizer()
 	return &testBotWrapper{
 		db:             db,
 		jellyfinClient: jf,
+		localizer:      localizer,
 		sentMessages:   make(map[int64][]string),
 		sentKeyboards:  make(map[int64][]*botModels.InlineKeyboardMarkup),
 	}
@@ -186,13 +229,13 @@ func (tb *testBotWrapper) broadcastNotificationForTest(ctx context.Context, cont
 		return nil
 	}
 
-	// Format notification message
-	message := FormatNotification(content)
+	// Format notification message with localizer
+	message := FormatNotification(content, tb.localizer)
 
 	// Create inline keyboard for episodes with valid series name
 	var keyboard *botModels.InlineKeyboardMarkup
 	if shouldShowMuteButton(content) {
-		keyboard = createMuteButton(content.SeriesName)
+		keyboard = createTestMuteButton(content.SeriesName, tb.localizer)
 	}
 
 	// Fetch poster image
@@ -381,6 +424,7 @@ func TestBroadcastNotification_InlineMuteButtonOnEpisodes(t *testing.T) {
 	}
 
 	button := keyboard.InlineKeyboard[0][0]
+	// Button text should be "Mute" in Persian
 	if button.Text != "دنبال نکردن" {
 		t.Errorf("Expected button text 'دنبال نکردن', got '%s'", button.Text)
 	}
