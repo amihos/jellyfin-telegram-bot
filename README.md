@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.22%2B-blue)](https://go.dev/)
+[![Release](https://img.shields.io/github/v/release/amihos/jellyfin-telegram-bot)](https://github.com/amihos/jellyfin-telegram-bot/releases/latest)
 [![Test](https://github.com/amihos/jellyfin-telegram-bot/workflows/Test/badge.svg)](https://github.com/amihos/jellyfin-telegram-bot/actions/workflows/test.yml)
 [![Build](https://github.com/amihos/jellyfin-telegram-bot/workflows/Build/badge.svg)](https://github.com/amihos/jellyfin-telegram-bot/actions/workflows/build.yml)
 [![Docker](https://github.com/amihos/jellyfin-telegram-bot/workflows/Docker/badge.svg)](https://github.com/amihos/jellyfin-telegram-bot/actions/workflows/docker.yml)
