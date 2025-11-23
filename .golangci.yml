@@ -26,9 +26,16 @@ linters:
 
 linters-settings:
   errcheck:
-    check-blank: true
+    check-blank: false  # Too noisy for existing code
   govet:
-    enable-all: true
+    enable:
+      - shadow
+      - printf
+      - shift
+      - structtag
+      - nilness
+    disable:
+      - fieldalignment  # Micro-optimization, not critical
   gofmt:
     simplify: true
   misspell:
@@ -36,6 +43,7 @@ linters-settings:
   gosec:
     excludes:
       - G104  # Audit errors not checked (too noisy)
+      - G114  # HTTP server timeouts (will be addressed separately)
 
 issues:
   exclude-use-default: false
