@@ -118,43 +118,49 @@ func NewBot(token string, db SubscriberDB, jellyfinClient JellyfinClient, cfg *c
 
 // registerBotCommands registers bot commands with Telegram for Menu Button integration
 func (b *Bot) registerBotCommands(ctx context.Context) error {
-	// For now, register commands in English
-	// TODO: Support per-user language for commands (requires BotCommandScope)
-	localizer := i18n.GetLocalizer(b.i18nBundle, "en")
+	// Register commands for each supported language
+	for _, langCode := range i18n.SupportedLanguages {
+		localizer := i18n.GetLocalizer(b.i18nBundle, langCode)
 
-	commands := []botModels.BotCommand{
-		{
-			Command:     "start",
-			Description: i18n.T(localizer, "command.start.description"),
-		},
-		{
-			Command:     "recent",
-			Description: i18n.T(localizer, "command.recent.description"),
-		},
-		{
-			Command:     "search",
-			Description: i18n.T(localizer, "command.search.description"),
-		},
-		{
-			Command:     "mutedlist",
-			Description: i18n.T(localizer, "command.mutedlist.description"),
-		},
-		{
-			Command:     "language",
-			Description: i18n.T(localizer, "command.language.description"),
-		},
+		commands := []botModels.BotCommand{
+			{
+				Command:     "start",
+				Description: i18n.T(localizer, "command.start.description"),
+			},
+			{
+				Command:     "recent",
+				Description: i18n.T(localizer, "command.recent.description"),
+			},
+			{
+				Command:     "search",
+				Description: i18n.T(localizer, "command.search.description"),
+			},
+			{
+				Command:     "mutedlist",
+				Description: i18n.T(localizer, "command.mutedlist.description"),
+			},
+			{
+				Command:     "language",
+				Description: i18n.T(localizer, "command.language.description"),
+			},
+		}
+
+		_, err := b.bot.SetMyCommands(ctx, &bot.SetMyCommandsParams{
+			Commands:     commands,
+			LanguageCode: langCode,
+		})
+
+		if err != nil {
+			slog.Warn("Failed to set bot commands for language",
+				"language", langCode,
+				"error", err)
+			// Continue with other languages even if one fails
+		} else {
+			slog.Info("Bot commands registered for language",
+				"language", langCode,
+				"count", len(commands))
+		}
 	}
-
-	_, err := b.bot.SetMyCommands(ctx, &bot.SetMyCommandsParams{
-		Commands: commands,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to set bot commands: %w", err)
-	}
-
-	slog.Info("Bot commands registered successfully",
-		"count", len(commands))
 
 	return nil
 }
